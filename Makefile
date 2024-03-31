@@ -1,7 +1,12 @@
 EXE=allocate
+CC=gcc
+CFLAGS=-Wall
+LIBS=-lm
 
 $(EXE): main.c
-	gcc -Wall -o $(EXE) $<
+	$(CC) $(CFLAGS) -o $(EXE) main.c $(LIBS)
 
-format:
-	clang-format -style=file -i *.c
+clean:
+	rm -f $(EXE) $(EXE).exe
+
+.PHONY: clean
