@@ -1,7 +1,17 @@
-EXE=allocate
+CC = gcc
+CFLAGS = -Wall
+EXE = allocate
+
+all: $(EXE)
 
 $(EXE): main.c
-	gcc -Wall -o $(EXE) $<
+	$(CC) $(CFLAGS) -o $(EXE) $< -lm
+
+%.o: %.c %.h
+	$(CC)·-c -o $@ $< $(CC) $(CFLAGS)
+
+clean:
+	rm -f *.o $(EXE)
 
 format:
-	clang-format -style=file -i *.c
+	clang-format -i *.c *.h
