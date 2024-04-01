@@ -9,24 +9,27 @@ typedef struct {
     int remainingTime;
     int startTime; 
     int finishTime; 
+    
 } Process;
 
 int main(int argc, char *argv[]) {
     Process processes[2];
     int numProcesses = 0;
     char *filename = NULL;
+    char *memoryStrategy = NULL; 
     int quantum = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
             filename = argv[++i];
         } else if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
-
+            memoryStrategy = argv[++i]; 
         } else if (strcmp(argv[i], "-q") == 0 && i + 1 < argc) {
             quantum = atoi(argv[++i]);
         }
     }
 
+// scan the file ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if (filename == NULL || quantum == 0) {
         fprintf(stderr, "Usage: %s -f <filename> -q <quantum>\n", argv[0]);
         return 1;
@@ -37,6 +40,8 @@ int main(int argc, char *argv[]) {
         perror("Unable to open file");
         return 1;
     }
+
+
 
 while(fscanf(file, "%d %s %d %*d", &processes[numProcesses].startTime, processes[numProcesses].name, &processes[numProcesses].serviceTime) != EOF) {
     processes[numProcesses].remainingTime = processes[numProcesses].serviceTime;
@@ -50,7 +55,14 @@ while(fscanf(file, "%d %s %d %*d", &processes[numProcesses].startTime, processes
  
     double maxTimeOverhead = 0.0;
 
-while(completedProcesses < numProcesses) {
+
+
+//allocate algorithm//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//Round Robin////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+if (strcmp(memoryStrategy, "infinite") == 0) {
+    while(completedProcesses < numProcesses) {
     for(int i = 0; i < numProcesses; i++) {
         if(processes[i].remainingTime > 0) {
             if(processes[i].startTime == -1) processes[i].startTime = currentTime;
@@ -81,7 +93,20 @@ while(completedProcesses < numProcesses) {
     }
 }
 
- 
+} else if (strcmp(memoryStrategy, "first-fit") == 0) {
+
+}
+
+
+
+
+
+
+
+
+
+
+//output result////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
     double totalTurnaroundTime = 0;
     for(int i = 0; i < numProcesses; i++) {
         totalTurnaroundTime += processes[i].finishTime - processes[i].startTime;
