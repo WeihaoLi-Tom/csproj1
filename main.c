@@ -233,12 +233,12 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
     printf("Time overhead %.2f %.2f\n", maxOverhead, averageTimeOverhead);
     printf("Makespan %d\n", currentTime);
 
-    for(int i = 0; i < numProcesses; i++) {
-    printf("Process %s started at %d and finished at %d\n", 
-           processes[i].name, 
-           processes[i].startTime, 
-           processes[i].finishTime);
-}
+//     for(int i = 0; i < numProcesses; i++) {
+//     printf("Process %s started at %d and finished at %d\n", 
+//            processes[i].name, 
+//            processes[i].startTime, 
+//            processes[i].finishTime);
+// }
 
     return 0;
 }
