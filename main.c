@@ -116,7 +116,7 @@ if (strcmp(memoryStrategy, "infinite") == 0) {
         for(int i = 0; i < numProcesses; i++) {
             currentProcess = (currentProcess + 1) % numProcesses;
 
-            // 更新已到达但未完成的进程数
+            
             int remainingProcesses = 0;
             for(int j = 0; j < numProcesses; j++) {
                 if(processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
@@ -127,7 +127,7 @@ if (strcmp(memoryStrategy, "infinite") == 0) {
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
                 foundProcessToRun = true;
 
-                // 如果当前进程是第一次运行或与上一个进程不同
+                
                 if (quantumCounter == 0 && currentProcess != lastProcess ) { 
                     printf("%d,RUNNING,process-name=%s,remaining-time=%d\n", currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime);
                     lastProcess = currentProcess; 
@@ -143,14 +143,14 @@ if (strcmp(memoryStrategy, "infinite") == 0) {
                         printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n", currentTime, processes[currentProcess].name, remainingProcesses - 1);
                     }
 
-                    quantumCounter = 0; // 重置量子时间计数器
+                    quantumCounter = 0; 
                 }
                 break;
             }
         }
 
         if (!foundProcessToRun && quantumCounter == 0) {
-            currentTime++; // 如果没有进程在运行，时间前进一单位
+            currentTime++; 
         }
     }
 }
