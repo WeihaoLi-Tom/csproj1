@@ -115,7 +115,8 @@ if (strcmp(memoryStrategy, "infinite") == 0) {
 
            
             int timeToRun = quantum;
-            printf("%d RUNNING process-name=%s remaining-time=%d\n", currentTime, processes[i].name, processes[i].remainingTime);
+            printf("%d,RUNNING,process-name=%s,remaining-time=%d\n", currentTime, processes[i].name, processes[i].remainingTime);
+
             
            
             processes[i].remainingTime -= timeToRun;
@@ -128,7 +129,7 @@ if (strcmp(memoryStrategy, "infinite") == 0) {
                 processes[i].finishTime = currentTime; 
                 completedProcesses++;
                 int remainingProcesses = numProcesses - completedProcesses;
-                printf("%d FINISHED process-name=%s, proc-remaining=%d\n", currentTime, processes[i].name, remainingProcesses);
+                printf("%d,FINISHED,process-name=%s, proc-remaining=%d\n", currentTime, processes[i].name, remainingProcesses);
 
                 
                 int turnaroundTime = processes[i].finishTime - processes[i].startTime;
