@@ -99,7 +99,7 @@ while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[
     int completedProcesses = 0;
 
  
-    double maxTimeOverhead = 0.0;
+  
 
 
 
@@ -108,42 +108,52 @@ while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[
 
 //Round Robin////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 if (strcmp(memoryStrategy, "infinite") == 0) {
+    int currentProcess = -1; 
+    int lastProcess = -1;
+    int quantumCounter = 0; 
+
     while(completedProcesses < numProcesses) {
-    for(int i = 0; i < numProcesses; i++) {
-        if(processes[i].remainingTime > 0) {
-            if(processes[i].startTime == -1) processes[i].startTime = currentTime;
+        bool foundProcessToRun = false;
+        for(int i = 0; i < numProcesses; i++) {
+            currentProcess = (currentProcess + 1) % numProcesses;
+            if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
+                foundProcessToRun = true;
+                // If the current process is different from the last one, print the RUNNING message
+                if (quantumCounter == 0 && currentProcess != lastProcess ) { // Only print at the start of a quantum
+                    printf("%d,RUNNING,process-name=%s,remaining-time=%d\n", currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime);
+                    lastProcess = currentProcess; 
+                }
 
-           
-            int timeToRun = quantum;
-            printf("%d,RUNNING,process-name=%s,remaining-time=%d\n", currentTime, processes[i].name, processes[i].remainingTime);
-
-            
-           
-            processes[i].remainingTime -= timeToRun;
-
-            
-            currentTime += timeToRun;
-
-            
-            if(processes[i].remainingTime <= 0) {
-                processes[i].finishTime = currentTime; 
-                completedProcesses++;
-                int remainingProcesses = numProcesses - completedProcesses;
-                printf("%d,FINISHED,process-name=%s, proc-remaining=%d\n", currentTime, processes[i].name, remainingProcesses);
-
-                
-                int turnaroundTime = processes[i].finishTime - processes[i].startTime;
-                double timeOverhead = (double)turnaroundTime / processes[i].serviceTime;
-                if(timeOverhead > maxTimeOverhead) maxTimeOverhead = timeOverhead;
+                // Simulate the process running for the quantum duration
+                if (++quantumCounter == quantum) {
+                    processes[currentProcess].remainingTime -= quantum;
+                    if (processes[currentProcess].remainingTime <= 0) {
+                        processes[currentProcess].finishTime = currentTime + quantum; // Adjust for the quantum duration
+                        completedProcesses++;
+                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n", currentTime + quantum, processes[currentProcess].name, numProcesses - completedProcesses);
+                    }
+                    // Reset for the next process or quantum
+                    quantumCounter = 0;
+                    currentTime += quantum; // Update currentTime only after a whole quantum has passed
+                }
+                break; // Exit the loop to simulate the end of quantum or process completion
             }
+        }
+
+        if (!foundProcessToRun && quantumCounter == 0) {
+            currentTime++; // If no process is running in this quantum, increment currentTime
         }
     }
 }
 
 
-//First in first out////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-} 
+
+
+
+
+
+//First in first out////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 else if (strcmp(memoryStrategy, "first-fit") == 0) {
     bool allProcessesBlocked = false; 
 
@@ -196,26 +206,39 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
 
 //output result////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
     double totalTurnaroundTime = 0;
+    double totalOverhead=0;
+    double maxOverhead=0.00;
     for(int i = 0; i < numProcesses; i++) {
         totalTurnaroundTime += processes[i].finishTime - processes[i].startTime;
+        int turnaroundTime = processes[i].finishTime - processes[i].startTime;
+        double timeOverhead = (double)turnaroundTime / processes[i].serviceTime;
+        totalOverhead += timeOverhead;
+
+        if (timeOverhead > maxOverhead) {
+            maxOverhead = timeOverhead;
+            
+        }
+
+        
+
         
     }
     double averageTurnaroundTime = totalTurnaroundTime / numProcesses;
     
     
 
-    double averageTimeOverhead = maxTimeOverhead; 
+    double averageTimeOverhead =totalOverhead / completedProcesses ; 
 
     printf("Turnaround time %.0f\n", ceil(averageTurnaroundTime));
-    printf("Time overhead %.2f %.2f\n", maxTimeOverhead, averageTimeOverhead);
+    printf("Time overhead %.2f %.2f\n", maxOverhead, averageTimeOverhead);
     printf("Makespan %d\n", currentTime);
 
-//     for(int i = 0; i < numProcesses; i++) {
-//     printf("Process %s started at %d and finished at %d\n", 
-//            processes[i].name, 
-//            processes[i].startTime, 
-//            processes[i].finishTime);
-// }
+    for(int i = 0; i < numProcesses; i++) {
+    printf("Process %s started at %d and finished at %d\n", 
+           processes[i].name, 
+           processes[i].startTime, 
+           processes[i].finishTime);
+}
 
     return 0;
 }
