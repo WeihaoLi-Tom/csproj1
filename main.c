@@ -97,9 +97,8 @@ while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[
 
     int currentTime = 0;
     int completedProcesses = 0;
+    
 
- 
-  
 
 
 
@@ -116,35 +115,46 @@ if (strcmp(memoryStrategy, "infinite") == 0) {
         bool foundProcessToRun = false;
         for(int i = 0; i < numProcesses; i++) {
             currentProcess = (currentProcess + 1) % numProcesses;
+
+            // 更新已到达但未完成的进程数
+            int remainingProcesses = 0;
+            for(int j = 0; j < numProcesses; j++) {
+                if(processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
+                    remainingProcesses++;
+                }
+            }
+
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
                 foundProcessToRun = true;
-                // If the current process is different from the last one, print the RUNNING message
-                if (quantumCounter == 0 && currentProcess != lastProcess ) { // Only print at the start of a quantum
+
+                // 如果当前进程是第一次运行或与上一个进程不同
+                if (quantumCounter == 0 && currentProcess != lastProcess ) { 
                     printf("%d,RUNNING,process-name=%s,remaining-time=%d\n", currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime);
                     lastProcess = currentProcess; 
                 }
 
-                // Simulate the process running for the quantum duration
                 if (++quantumCounter == quantum) {
                     processes[currentProcess].remainingTime -= quantum;
+                    currentTime += quantum;
+
                     if (processes[currentProcess].remainingTime <= 0) {
-                        processes[currentProcess].finishTime = currentTime + quantum; // Adjust for the quantum duration
+                        processes[currentProcess].finishTime = currentTime;
                         completedProcesses++;
-                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n", currentTime + quantum, processes[currentProcess].name, numProcesses - completedProcesses);
+                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n", currentTime, processes[currentProcess].name, remainingProcesses - 1);
                     }
-                    // Reset for the next process or quantum
-                    quantumCounter = 0;
-                    currentTime += quantum; // Update currentTime only after a whole quantum has passed
+
+                    quantumCounter = 0; // 重置量子时间计数器
                 }
-                break; // Exit the loop to simulate the end of quantum or process completion
+                break;
             }
         }
 
         if (!foundProcessToRun && quantumCounter == 0) {
-            currentTime++; // If no process is running in this quantum, increment currentTime
+            currentTime++; // 如果没有进程在运行，时间前进一单位
         }
     }
 }
+
 
 
 
