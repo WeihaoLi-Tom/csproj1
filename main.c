@@ -17,8 +17,7 @@ typedef struct {
 } Process;
 //prework and support functions/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool memory[TOTAL_MEMORY] = {false}; 
-
+//basic round robin///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void runRoundRobin(Process processes[], int numProcesses, int quantum, int *currentTime, int *completedProcesses) {
     int currentProcess = -1; 
     int lastProcess = -1;
@@ -66,6 +65,67 @@ void runRoundRobin(Process processes[], int numProcesses, int quantum, int *curr
     }
 }
 
+bool memory[TOTAL_MEMORY] = {false};
+Process* allocatedProcesses[5];
+int allocatedProcessCount = 0;
+
+
+bool allocateMemory(Process* process) {
+    printf("Allocating memory for %s, memory required: %d blocks.\n", process->name, process->memoryRequirement);
+    int blocksNeeded = process->memoryRequirement;
+    for (int i = 0; i <= TOTAL_MEMORY - blocksNeeded; i++) {
+        bool spaceFound = true;
+        for (int j = 0; j < blocksNeeded; j++) {
+            if (memory[i + j]) {
+                spaceFound = false;
+                break;
+            }
+        }
+        if (spaceFound) {
+            for (int j = 0; j < blocksNeeded; j++) {
+                memory[i + j] = true;
+            }
+            process->memoryStart = i; 
+            allocatedProcesses[allocatedProcessCount++] = process;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+
+
+void freeMemory(Process* process) {
+    for (int i = process->memoryStart; i < process->memoryStart + process->memoryRequirement; i++) {
+        memory[i] = false;
+    }
+    process->memoryStart = -1;
+    for (int i = 0; i < allocatedProcessCount; i++) {
+        if (allocatedProcesses[i] == process) {
+            allocatedProcesses[i] = allocatedProcesses[--allocatedProcessCount];
+            break;
+        }
+    }
+}
+
+double calculateMemoryUsage(Process processes[], int numProcesses) {
+    int totalMemoryUsed = 0;
+    
+    for (int i = 0; i < allocatedProcessCount; i++) {
+        totalMemoryUsed += allocatedProcesses[i]->memoryRequirement;
+    }
+    printf("Debug: Total Allocated Processes: %d\n", allocatedProcessCount);
+for (int i = 0; i < allocatedProcessCount; i++) {
+    printf("Debug: Process %s, Memory Required: %d\n", allocatedProcesses[i]->name, allocatedProcesses[i]->memoryRequirement);
+}
+
+    return ((double)totalMemoryUsed / TOTAL_MEMORY) * 100;
+}
+
+
+
 
 
 //Command build///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,9 +166,11 @@ while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[
     processes[numProcesses].remainingTime = processes[numProcesses].serviceTime;
     numProcesses++;
 }
+for (int i = 0; i < numProcesses; i++) {
+    printf("Process %s, Memory Requirement: %d\n", processes[i].name, processes[i].memoryRequirement);
+}
 
     fclose(file);
-
 
     
 
@@ -121,20 +183,81 @@ while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[
 //Round Robin////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if (strcmp(memoryStrategy, "infinite") == 0) {
         runRoundRobin(processes, numProcesses, quantum, &currentTime, &completedProcesses);
-    }
-
-
-
-
-
-
-
-
+}
 
 //First in first out////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 else if (strcmp(memoryStrategy, "first-fit") == 0) {
+    int currentProcess = -1; 
+    int lastProcess = -1;
+    int quantumCounter = 0;
+    double memUsage = 0;
 
+    while(completedProcesses < numProcesses) {
+        bool foundProcessToRun = false;
+        for(int i = 0; i < numProcesses; i++) {
+            currentProcess = (currentProcess + 1) % numProcesses;
+
+           
+            int remainingProcesses = 0;
+            for(int j = 0; j < numProcesses; j++) {
+                if(processes[j].remainingTime > 0) {
+                    remainingProcesses++;
+                }
+            }
+
+            if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
+                
+                if (processes[currentProcess].memoryStart == -1) {
+                    printf("Before allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
+                    bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
+                    printf("After allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
+                    if (!isMemoryAllocated) {
+                        printf("Failed to allocate memory for %s\n", processes[currentProcess].name);
+                        continue; 
+                    }
+                    memUsage = calculateMemoryUsage(processes, numProcesses); 
+                }
+
+                foundProcessToRun = true;
+                if (quantumCounter == 0 && currentProcess != lastProcess) {
+                    printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%.2f%%,allocated-at=%d\n",
+                           currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
+                           memUsage, processes[currentProcess].memoryStart);
+                    lastProcess = currentProcess;
+                }
+
+                if (++quantumCounter == quantum) {
+                    processes[currentProcess].remainingTime -= quantum;
+                    currentTime += quantum;
+                    quantumCounter = 0; 
+
+                    if (processes[currentProcess].remainingTime <= 0) {
+                        processes[currentProcess].finishTime = currentTime;
+                        completedProcesses++;
+                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d,mem-usage=%.2f%%\n",
+                               currentTime, processes[currentProcess].name, remainingProcesses - 1, memUsage);
+                    }
+                }
+                break; 
+            }
+        }
+
+        if (!foundProcessToRun && quantumCounter == 0) {
+            currentTime++; 
+        }
+    }
+
+    // 释放所有进程的内存
+    for(int i = 0; i < numProcesses; i++) {
+        if(processes[i].memoryStart != -1) {
+            freeMemory(&processes[i]);
+        }
+    }
 }
+
+
+
+
 
 
 
