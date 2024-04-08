@@ -238,12 +238,15 @@ while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[
     processes[numProcesses].remainingTime = processes[numProcesses].serviceTime;
     numProcesses++;
 }
-for (int i = 0; i < numProcesses; i++) {
-    printf("Process %s, Memory Requirement: %d\n", processes[i].name, processes[i].memoryRequirement);
-}
+// for (int i = 0; i < numProcesses; i++) {
+//     printf("Process %s, Memory Requirement: %d\n", processes[i].name, processes[i].memoryRequirement);
+// }
 
     fclose(file);
 
+for (int i = 0; i < numProcesses; i++) {
+    processes[i].memoryStart = -1; 
+}
     
 
 
@@ -263,12 +266,14 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
     int lastProcess = -1;
     int quantumCounter = 0;
     double memUsage = 0;
+    printf("hi1 \n");
 
     while(completedProcesses < numProcesses) {
         bool foundProcessToRun = false;
         for(int i = 0; i < numProcesses; i++) {
             currentProcess = (currentProcess + 1) % numProcesses;
 
+   
            
             int remainingProcesses = 0;
             for(int j = 0; j < numProcesses; j++) {
@@ -277,17 +282,23 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
                 }
             }
 
+            printf("hi2 \n");
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
-                
+                printf("Current Time: %d, Current Process: %d\n", currentTime, currentProcess);
+
+            
                 if (processes[currentProcess].memoryStart == -1) {
-                    //printf("Before allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
+                    printf("hi3 \n");
+                   
                     bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
-                    //printf("After allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
+                    printf("hi4 \n");
+                    
                     if (!isMemoryAllocated) {
-                        //printf("Failed to allocate memory for %s\n", processes[currentProcess].name);
-                        continue; 
+                        
+                        continue;
                     }
                     memUsage = calculateMemoryUsage(processes, numProcesses); 
+                    printf("hi5 \n");
                 }
 
                 foundProcessToRun = true;
