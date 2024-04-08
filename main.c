@@ -64,65 +64,136 @@ void runRoundRobin(Process processes[], int numProcesses, int quantum, int *curr
         }
     }
 }
-
+//memory allocation and etc.////////////////////////////////////////////////////////////////////////////////
 bool memory[TOTAL_MEMORY] = {false};
 Process* allocatedProcesses[5];
 int allocatedProcessCount = 0;
 
+typedef struct MemoryBlock {
+    char type[6];  
+    int start;
+    int length;
+    struct MemoryBlock* next;
+} MemoryBlock;
+
+MemoryBlock* head = NULL;
+
+void initMemory() {
+    head = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+    strcpy(head->type, "hole");
+    head->start = 0;
+    head->length = TOTAL_MEMORY;
+    head->next = NULL;
+}
+
+
+typedef struct AllocatedProcessNode {
+    Process* process;
+    struct AllocatedProcessNode* next;
+} AllocatedProcessNode;
+    
+AllocatedProcessNode* allocatedHead = NULL; 
+
+
 
 bool allocateMemory(Process* process) {
-    printf("Allocating memory for %s, memory required: %d blocks.\n", process->name, process->memoryRequirement);
-    int blocksNeeded = process->memoryRequirement;
-    for (int i = 0; i <= TOTAL_MEMORY - blocksNeeded; i++) {
-        bool spaceFound = true;
-        for (int j = 0; j < blocksNeeded; j++) {
-            if (memory[i + j]) {
-                spaceFound = false;
-                break;
+    MemoryBlock* current = head;
+    MemoryBlock* prev = NULL;
+
+    while (current != NULL) {
+        if (strcmp(current->type, "hole") == 0 && current->length >= process->memoryRequirement) {
+            
+            //printf("Allocating memory for %s, memory required: %d blocks.\n", process->name, process->memoryRequirement);
+
+           
+            process->memoryStart = current->start;
+
+            
+            if (current->length == process->memoryRequirement) {
+                strcpy(current->type, "process");
+            } else {
+                
+                MemoryBlock* newBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+                newBlock->start = current->start + process->memoryRequirement;
+                newBlock->length = current->length - process->memoryRequirement;
+                strcpy(newBlock->type, "hole");
+                newBlock->next = current->next;
+
+                current->next = newBlock;
+                current->length = process->memoryRequirement;
+                strcpy(current->type, "process");
             }
-        }
-        if (spaceFound) {
-            for (int j = 0; j < blocksNeeded; j++) {
-                memory[i + j] = true;
-            }
-            process->memoryStart = i; 
-            allocatedProcesses[allocatedProcessCount++] = process;
+
             return true;
         }
+        prev = current;
+        current = current->next;
     }
-    return false;
+    return false; 
 }
+
 
 
 
 
 
 void freeMemory(Process* process) {
-    for (int i = process->memoryStart; i < process->memoryStart + process->memoryRequirement; i++) {
-        memory[i] = false;
-    }
-    process->memoryStart = -1;
-    for (int i = 0; i < allocatedProcessCount; i++) {
-        if (allocatedProcesses[i] == process) {
-            allocatedProcesses[i] = allocatedProcesses[--allocatedProcessCount];
-            break;
+    MemoryBlock* current = head;
+    MemoryBlock* prev = NULL;
+
+    while (current != NULL) {
+        if (strcmp(current->type, "process") == 0 && current->start == process->memoryStart) {
+            printf("Freeing memory for %s starting at %d\n", process->name, process->memoryStart);
+
+        
+            strcpy(current->type, "hole");
+
+            // combine hole
+            if (prev != NULL && strcmp(prev->type, "hole") == 0) {
+                
+                prev->length += current->length;
+                prev->next = current->next;
+                free(current);
+                current = prev->next;
+            } else {
+                prev = current;
+                current = current->next;
+            }
+
+           
+            if (current != NULL && strcmp(current->type, "hole") == 0) {
+                prev->length += current->length;
+                prev->next = current->next;
+                free(current);
+            }
+
+            return;
         }
+        prev = current;
+        current = current->next;
     }
 }
 
-double calculateMemoryUsage(Process processes[], int numProcesses) {
+
+
+double calculateMemoryUsage() {
     int totalMemoryUsed = 0;
-    
-    for (int i = 0; i < allocatedProcessCount; i++) {
-        totalMemoryUsed += allocatedProcesses[i]->memoryRequirement;
+    MemoryBlock* current = head;
+
+    while (current != NULL) {
+        if (strcmp(current->type, "process") == 0) {
+            totalMemoryUsed += current->length;
+        }
+        current = current->next;
     }
-    printf("Debug: Total Allocated Processes: %d\n", allocatedProcessCount);
-for (int i = 0; i < allocatedProcessCount; i++) {
-    printf("Debug: Process %s, Memory Required: %d\n", allocatedProcesses[i]->name, allocatedProcesses[i]->memoryRequirement);
+
+    printf("Debug: Total Memory Used: %d\n", totalMemoryUsed);
+    double usage = ((double)totalMemoryUsed / TOTAL_MEMORY) * 100;
+    printf("Memory Usage: %.2f%%\n", usage);
+    return usage;
 }
 
-    return ((double)totalMemoryUsed / TOTAL_MEMORY) * 100;
-}
+
 
 
 
@@ -130,6 +201,7 @@ for (int i = 0; i < allocatedProcessCount; i++) {
 
 //Command build///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
+    
     Process processes[10];
     int numProcesses = 0;
     char *filename = NULL;
@@ -208,11 +280,11 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
                 
                 if (processes[currentProcess].memoryStart == -1) {
-                    printf("Before allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
+                    //printf("Before allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
                     bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
-                    printf("After allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
+                    //printf("After allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
                     if (!isMemoryAllocated) {
-                        printf("Failed to allocate memory for %s\n", processes[currentProcess].name);
+                        //printf("Failed to allocate memory for %s\n", processes[currentProcess].name);
                         continue; 
                     }
                     memUsage = calculateMemoryUsage(processes, numProcesses); 
