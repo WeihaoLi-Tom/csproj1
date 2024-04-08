@@ -79,6 +79,7 @@ typedef struct MemoryBlock {
 MemoryBlock* head = NULL;
 
 void initMemory() {
+    
     head = (MemoryBlock*)malloc(sizeof(MemoryBlock));
     strcpy(head->type, "hole");
     head->start = 0;
@@ -97,36 +98,41 @@ AllocatedProcessNode* allocatedHead = NULL;
 
 
 bool allocateMemory(Process* process) {
+    initMemory();
     MemoryBlock* current = head;
-    MemoryBlock* prev = NULL;
-
+    //MemoryBlock* prev = NULL;
+     //printf("hi im here");
     while (current != NULL) {
+        //printf("hi im in");
         if (strcmp(current->type, "hole") == 0 && current->length >= process->memoryRequirement) {
             
-            //printf("Allocating memory for %s, memory required: %d blocks.\n", process->name, process->memoryRequirement);
+            printf("Allocating memory for %s, memory required: %d blocks.\n", process->name, process->memoryRequirement);
 
            
             process->memoryStart = current->start;
 
             
             if (current->length == process->memoryRequirement) {
+                printf("hi if");
                 strcpy(current->type, "process");
             } else {
                 
                 MemoryBlock* newBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+                printf("cuttrnt %d\n", current->start);
                 newBlock->start = current->start + process->memoryRequirement;
                 newBlock->length = current->length - process->memoryRequirement;
                 strcpy(newBlock->type, "hole");
-                newBlock->next = current->next;
-
+                newBlock->next = NULL;
                 current->next = newBlock;
                 current->length = process->memoryRequirement;
                 strcpy(current->type, "process");
+                
             }
-
+    printf("hi im out");
+    
             return true;
         }
-        prev = current;
+        //prev = current;
         current = current->next;
     }
     return false; 
@@ -143,7 +149,7 @@ void freeMemory(Process* process) {
 
     while (current != NULL) {
         if (strcmp(current->type, "process") == 0 && current->start == process->memoryStart) {
-            printf("Freeing memory for %s starting at %d\n", process->name, process->memoryStart);
+            //printf("Freeing memory for %s starting at %d\n", process->name, process->memoryStart);
 
         
             strcpy(current->type, "hole");
@@ -187,9 +193,9 @@ double calculateMemoryUsage() {
         current = current->next;
     }
 
-    printf("Debug: Total Memory Used: %d\n", totalMemoryUsed);
-    double usage = ((double)totalMemoryUsed / TOTAL_MEMORY) * 100;
-    printf("Memory Usage: %.2f%%\n", usage);
+    //printf("Debug: Total Memory Used: %d\n", totalMemoryUsed);
+    double usage = ceil(((double)totalMemoryUsed / TOTAL_MEMORY) * 100);
+    //printf("Memory Usage: %.2f%%\n", usage);
     return usage;
 }
 
@@ -266,7 +272,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
     int lastProcess = -1;
     int quantumCounter = 0;
     double memUsage = 0;
-    printf("hi1 \n");
+    
 
     while(completedProcesses < numProcesses) {
         bool foundProcessToRun = false;
@@ -282,23 +288,24 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
                 }
             }
 
-            printf("hi2 \n");
+           
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
-                printf("Current Time: %d, Current Process: %d\n", currentTime, currentProcess);
+                //printf("Current Time: %d, Current Process: %d\n", currentTime, currentProcess);
 
             
                 if (processes[currentProcess].memoryStart == -1) {
-                    printf("hi3 \n");
+                    
                    
                     bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
-                    printf("hi4 \n");
+                    
+                    //printf("Memory allocated %d\n", processes[currentProcess].memoryStart);
                     
                     if (!isMemoryAllocated) {
                         
                         continue;
                     }
                     memUsage = calculateMemoryUsage(processes, numProcesses); 
-                    printf("hi5 \n");
+                    
                 }
 
                 foundProcessToRun = true;
@@ -317,8 +324,8 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
                     if (processes[currentProcess].remainingTime <= 0) {
                         processes[currentProcess].finishTime = currentTime;
                         completedProcesses++;
-                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d,mem-usage=%.2f%%\n",
-                               currentTime, processes[currentProcess].name, remainingProcesses - 1, memUsage);
+                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d,\n",
+                               currentTime, processes[currentProcess].name, remainingProcesses - 1);
                     }
                 }
                 break; 
@@ -330,7 +337,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
         }
     }
 
-    // 释放所有进程的内存
+    
     for(int i = 0; i < numProcesses; i++) {
         if(processes[i].memoryStart != -1) {
             freeMemory(&processes[i]);
