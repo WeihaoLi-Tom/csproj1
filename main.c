@@ -207,7 +207,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
 
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
                 
-                if (processes[currentProcess].memoryStart == 0) {
+                if (processes[currentProcess].memoryStart == -1) {
                     printf("Before allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
                     bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
                     printf("After allocation for %s - Allocated Process Count: %d\n", processes[currentProcess].name, allocatedProcessCount);
