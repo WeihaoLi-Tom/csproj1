@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdbool.h>
 #define TOTAL_MEMORY 2048
+#define MAX_QUEUE_SIZE 10
 
 typedef struct {
     char name[10];
@@ -16,6 +17,8 @@ typedef struct {
     
 } Process;
 //prework and support functions/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+Process* waitingQueue[MAX_QUEUE_SIZE];
+int queueSize = 0; 
 
 //basic round robin///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void runRoundRobin(Process processes[], int numProcesses, int quantum, int *currentTime, int *completedProcesses) {
@@ -88,57 +91,90 @@ void initMemory() {
 }
 
 
-typedef struct AllocatedProcessNode {
-    Process* process;
-    struct AllocatedProcessNode* next;
-} AllocatedProcessNode;
-    
-AllocatedProcessNode* allocatedHead = NULL; 
 
 
+ 
 
 bool allocateMemory(Process* process) {
-    initMemory();
-    MemoryBlock* current = head;
-    //MemoryBlock* prev = NULL;
-     //printf("hi im here");
-    while (current != NULL) {
-        //printf("hi im in");
-        if (strcmp(current->type, "hole") == 0 && current->length >= process->memoryRequirement) {
-            
-            printf("Allocating memory for %s, memory required: %d blocks.\n", process->name, process->memoryRequirement);
+    //initMemory();
 
-           
+    MemoryBlock* current = head;
+    
+    while (current != NULL) {
+        if (strcmp(current->type, "hole") == 0 && current->length >= process->memoryRequirement) {
+            //printf("Allocating memory for %s, memory required: %d blocks.\n", process->name, process->memoryRequirement);
+
             process->memoryStart = current->start;
 
-            
             if (current->length == process->memoryRequirement) {
-                printf("hi if");
                 strcpy(current->type, "process");
+                //printf("Memory block exactly fits the requirement.\n");
             } else {
                 
                 MemoryBlock* newBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
-                printf("cuttrnt %d\n", current->start);
+                if (newBlock == NULL) {
+                    //printf("Memory allocation for newBlock failed.\n");
+                    return false;
+                }
                 newBlock->start = current->start + process->memoryRequirement;
                 newBlock->length = current->length - process->memoryRequirement;
                 strcpy(newBlock->type, "hole");
-                newBlock->next = NULL;
+                newBlock->next = current->next;
+
                 current->next = newBlock;
                 current->length = process->memoryRequirement;
                 strcpy(current->type, "process");
-                
+                //printf("Splitting memory block. New hole at %d, length %d.\n", newBlock->start, newBlock->length);
             }
-    printf("hi im out");
-    
+
             return true;
+
+            
         }
-        //prev = current;
         current = current->next;
+        //printf("Next pointer of current node is: %p\n", (void*)current->next);
+
+        
+        
     }
-    return false; 
+
+    if(current==NULL){
+        //printf("current now null");
+    }
+    //printf("Failed to allocate memory for process %s.\n", process->name);
+    
+    return false;
+    //printf("already false");
 }
 
 
+void addToWaitingQueue(Process* process) {
+    if (queueSize < MAX_QUEUE_SIZE) {
+        waitingQueue[queueSize++] = process;
+        //printf("Process %s added to waiting queue.\n", process->name);
+    } 
+}
+
+
+
+
+void tryAllocateMemoryForWaitingProcesses() {
+    int i = 0;
+    while (i < queueSize) {
+        Process* process = waitingQueue[i];
+        if (allocateMemory(process)) {
+            //printf("Memory allocated for %s from waiting queue.\n", process->name);
+            
+            for (int j = i; j < queueSize - 1; j++) {
+                waitingQueue[j] = waitingQueue[j + 1];
+            }
+            queueSize--;
+            
+        } else {
+            i++; 
+        }
+    }
+}
 
 
 
@@ -215,6 +251,7 @@ int main(int argc, char *argv[]) {
     int quantum = 0;
     int currentTime = 0;
     int completedProcesses = 0;
+    initMemory();
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -283,7 +320,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
            
             int remainingProcesses = 0;
             for(int j = 0; j < numProcesses; j++) {
-                if(processes[j].remainingTime > 0) {
+                if(processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
                     remainingProcesses++;
                 }
             }
@@ -294,14 +331,17 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
 
             
                 if (processes[currentProcess].memoryStart == -1) {
+
+                    
                     
                    
                     bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
                     
+                    
                     //printf("Memory allocated %d\n", processes[currentProcess].memoryStart);
                     
                     if (!isMemoryAllocated) {
-                        
+                        addToWaitingQueue(&processes[currentProcess]);
                         continue;
                     }
                     memUsage = calculateMemoryUsage(processes, numProcesses); 
@@ -324,6 +364,8 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
                     if (processes[currentProcess].remainingTime <= 0) {
                         processes[currentProcess].finishTime = currentTime;
                         completedProcesses++;
+                        freeMemory(&processes[currentProcess]); 
+                        tryAllocateMemoryForWaitingProcesses();
                         printf("%d,FINISHED,process-name=%s,proc-remaining=%d,\n",
                                currentTime, processes[currentProcess].name, remainingProcesses - 1);
                     }
@@ -339,6 +381,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
 
     
     for(int i = 0; i < numProcesses; i++) {
+        //printf("free memory");
         if(processes[i].memoryStart != -1) {
             freeMemory(&processes[i]);
         }
