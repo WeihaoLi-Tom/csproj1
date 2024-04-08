@@ -115,7 +115,7 @@ double calculateMemoryUsage(Process processes[], int numProcesses) {
     for (int i = 0; i < allocatedProcessCount; i++) {
         totalMemoryUsed += allocatedProcesses[i]->memoryRequirement;
     }
-    printf("Debug: Total Allocated Processes: %d\n", allocatedProcessCount);
+    //printf("Debug: Total Allocated Processes: %d\n", allocatedProcessCount);
 
     for (int i = 0; i < allocatedProcessCount; i++) {
         printf("Debug: Process %s, Memory Required: %d\n", allocatedProcesses[i]->name, allocatedProcesses[i]->memoryRequirement);
