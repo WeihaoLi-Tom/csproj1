@@ -308,7 +308,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
     int currentProcess = -1; 
     int lastProcess = -1;
     int quantumCounter = 0;
-    double memUsage = 0;
+    int memUsage = 0;
     
 
     while(completedProcesses < numProcesses) {
