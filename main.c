@@ -230,7 +230,7 @@ int calculateMemoryUsage() {
     }
 
     //printf("Debug: Total Memory Used: %d\n", totalMemoryUsed);
-    int usage = ceil((totalMemoryUsed / TOTAL_MEMORY) * 100);
+    int usage = round((totalMemoryUsed / TOTAL_MEMORY) * 100);
     //printf("Memory Usage: %.2f%%\n", usage);
     return usage;
 }
@@ -357,7 +357,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
                     printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%d%%,allocated-at=%d\n",
                            currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
                            memUsage, processes[currentProcess].memoryStart);
-                    
+
                     lastProcess = currentProcess;
                 }
 
