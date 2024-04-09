@@ -357,7 +357,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
                     printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%.2f%%,allocated-at=%d\n",
                            currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
                            memUsage, processes[currentProcess].memoryStart);
-                           s
+                    
                     lastProcess = currentProcess;
                 }
 
