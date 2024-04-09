@@ -350,9 +350,14 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
 
                 foundProcessToRun = true;
                 if (quantumCounter == 0 && currentProcess != lastProcess) {
+                    while(currentTime%quantum != 0){
+                        currentTime++;
+                    }
+
                     printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%.2f%%,allocated-at=%d\n",
                            currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
                            memUsage, processes[currentProcess].memoryStart);
+                           s
                     lastProcess = currentProcess;
                 }
 
@@ -366,7 +371,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
                         completedProcesses++;
                         freeMemory(&processes[currentProcess]); 
                         tryAllocateMemoryForWaitingProcesses();
-                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d,\n",
+                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n",
                                currentTime, processes[currentProcess].name, remainingProcesses - 1);
                     }
                 }
