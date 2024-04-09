@@ -218,7 +218,7 @@ void freeMemory(Process* process) {
 
 
 
-double calculateMemoryUsage() {
+int calculateMemoryUsage() {
     int totalMemoryUsed = 0;
     MemoryBlock* current = head;
 
@@ -230,7 +230,7 @@ double calculateMemoryUsage() {
     }
 
     //printf("Debug: Total Memory Used: %d\n", totalMemoryUsed);
-    double usage = ceil(((double)totalMemoryUsed / TOTAL_MEMORY) * 100);
+    int usage = ceil((totalMemoryUsed / TOTAL_MEMORY) * 100);
     //printf("Memory Usage: %.2f%%\n", usage);
     return usage;
 }
