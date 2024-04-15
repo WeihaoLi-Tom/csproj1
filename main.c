@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #define TOTAL_MEMORY 2048
 #define MAX_QUEUE_SIZE 10
+#define TOTAL_FRAMES 512 
+//#include "paged.h"
+
+
 
 typedef struct {
     char name[10];
@@ -13,12 +17,27 @@ typedef struct {
     int startTime; 
     int finishTime; 
     int memoryRequirement;
-    int memoryStart; 
-    
+    int memoryStart;
+    int lastUsed;
+    bool haspage;
+    //int pagesAllocated[TOTAL_FRAMES]; 
+     
 } Process;
+
 //prework and support functions/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 Process* waitingQueue[MAX_QUEUE_SIZE];
 int queueSize = 0; 
+
+
+typedef struct {
+    bool occupied;  // frame okay?
+    char owner[10];  // which take that
+    int page_number;
+    int lastUsed;  // 
+} Frame;
+
+Frame frames[TOTAL_FRAMES];
+
 
 //basic round robin///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void runRoundRobin(Process processes[], int numProcesses, int quantum, int *currentTime, int *completedProcesses) {
@@ -28,10 +47,11 @@ void runRoundRobin(Process processes[], int numProcesses, int quantum, int *curr
 
     while(*completedProcesses < numProcesses) {
         bool foundProcessToRun = false;
+
         for(int i = 0; i < numProcesses; i++) {
             currentProcess = (currentProcess + 1) % numProcesses;
-
             int remainingProcesses = 0;
+
             for(int j = 0; j < numProcesses; j++) {
                 if(processes[j].startTime <= *currentTime && processes[j].remainingTime > 0) {
                     remainingProcesses++;
@@ -67,7 +87,8 @@ void runRoundRobin(Process processes[], int numProcesses, int quantum, int *curr
         }
     }
 }
-//memory allocation and etc.////////////////////////////////////////////////////////////////////////////////
+
+//memory allocation and etc//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 bool memory[TOTAL_MEMORY] = {false};
 Process* allocatedProcesses[5];
 int allocatedProcessCount = 0;
@@ -82,7 +103,6 @@ typedef struct MemoryBlock {
 MemoryBlock* head = NULL;
 
 void initMemory() {
-    
     head = (MemoryBlock*)malloc(sizeof(MemoryBlock));
     strcpy(head->type, "hole");
     head->start = 0;
@@ -90,14 +110,7 @@ void initMemory() {
     head->next = NULL;
 }
 
-
-
-
- 
-
 bool allocateMemory(Process* process) {
-    //initMemory();
-
     MemoryBlock* current = head;
     
     while (current != NULL) {
@@ -110,17 +123,17 @@ bool allocateMemory(Process* process) {
                 strcpy(current->type, "process");
                 //printf("Memory block exactly fits the requirement.\n");
             } else {
-                
                 MemoryBlock* newBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+
                 if (newBlock == NULL) {
                     //printf("Memory allocation for newBlock failed.\n");
                     return false;
                 }
+
                 newBlock->start = current->start + process->memoryRequirement;
                 newBlock->length = current->length - process->memoryRequirement;
                 strcpy(newBlock->type, "hole");
                 newBlock->next = current->next;
-
                 current->next = newBlock;
                 current->length = process->memoryRequirement;
                 strcpy(current->type, "process");
@@ -128,14 +141,10 @@ bool allocateMemory(Process* process) {
             }
 
             return true;
-
-            
         }
+
         current = current->next;
         //printf("Next pointer of current node is: %p\n", (void*)current->next);
-
-        
-        
     }
 
     if(current==NULL){
@@ -147,37 +156,49 @@ bool allocateMemory(Process* process) {
     //printf("already false");
 }
 
-
 void addToWaitingQueue(Process* process) {
+//to check if the process already in
+    for (int i = 0; i < queueSize; i++) {
+        if (waitingQueue[i] == process) {
+            //printf("Process %s is already in the waiting queue.\n", process->name);
+            return;  
+        }
+    }
+
+
     if (queueSize < MAX_QUEUE_SIZE) {
-        waitingQueue[queueSize++] = process;
-        //printf("Process %s added to waiting queue.\n", process->name);
-    } 
+        waitingQueue[queueSize] = process;
+        queueSize++;
+
+        //printf("Process %s added to waiting queue. in queue processes: %d\n", process->name, queueSize);
+    } else {
+        //printf("Waiting queue is full. Cannot add process %s.\n", process->name);
+    }
 }
-
-
 
 
 void tryAllocateMemoryForWaitingProcesses() {
     int i = 0;
+
     while (i < queueSize) {
         Process* process = waitingQueue[i];
+
         if (allocateMemory(process)) {
             //printf("Memory allocated for %s from waiting queue.\n", process->name);
             
             for (int j = i; j < queueSize - 1; j++) {
                 waitingQueue[j] = waitingQueue[j + 1];
             }
+
             queueSize--;
-            
+
+            //printf("Memory allocated for %s. Queue size now: %d\n", process->name, queueSize);
+            //printf("remainpreocess:%d\n",processwaiting);
         } else {
             i++; 
         }
     }
 }
-
-
-
 
 void freeMemory(Process* process) {
     MemoryBlock* current = head;
@@ -186,13 +207,10 @@ void freeMemory(Process* process) {
     while (current != NULL) {
         if (strcmp(current->type, "process") == 0 && current->start == process->memoryStart) {
             //printf("Freeing memory for %s starting at %d\n", process->name, process->memoryStart);
-
-        
             strcpy(current->type, "hole");
 
             // combine hole
             if (prev != NULL && strcmp(prev->type, "hole") == 0) {
-                
                 prev->length += current->length;
                 prev->next = current->next;
                 free(current);
@@ -202,7 +220,6 @@ void freeMemory(Process* process) {
                 current = current->next;
             }
 
-           
             if (current != NULL && strcmp(current->type, "hole") == 0) {
                 prev->length += current->length;
                 prev->next = current->next;
@@ -211,12 +228,11 @@ void freeMemory(Process* process) {
 
             return;
         }
+
         prev = current;
         current = current->next;
     }
 }
-
-
 
 double calculateMemoryUsage() {
     int totalMemoryUsed = 0;
@@ -226,6 +242,7 @@ double calculateMemoryUsage() {
         if (strcmp(current->type, "process") == 0) {
             totalMemoryUsed += current->length;
         }
+
         current = current->next;
     }
 
@@ -235,6 +252,107 @@ double calculateMemoryUsage() {
     return usage;
 }
 
+////paged algorithm////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void initFrames() {
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+        frames[i].occupied = false;
+        frames[i].owner[0] = '\0'; 
+        frames[i].page_number = -1; 
+    }
+}
+
+
+bool allocatePages(Process *process) {
+    int pagesNeeded = (process->memoryRequirement + 3) / 4; 
+    int pagesdid = 0;
+
+    // 找空闲帧
+    for (int i = 0; i < TOTAL_FRAMES && pagesdid< pagesNeeded; i++) {
+        if (!frames[i].occupied) {
+            frames[i].occupied = true;
+            strcpy(frames[i].owner, process->name);  
+            frames[i].page_number = pagesdid;
+            //process->pagesAllocated[pagesdid] = true;
+            
+            pagesdid++;
+        }
+    }
+
+    // 
+    if (pagesdid == pagesNeeded) {
+        process->haspage = true;
+        return true;
+    } else {
+        for (int i = 0; i < TOTAL_FRAMES; i++) {
+            if (strcmp(frames[i].owner, process->name) == 0) { 
+                frames[i].occupied = false;  
+                frames[i].owner[0] = '\0';  
+                frames[i].page_number = -1;  
+            }
+        }
+        process->haspage = false; 
+        //这里应该要直接消除之前分配的所有帧，但可能有更好的办法？
+        return false;
+    }
+}
+
+
+int evictPage(Process processes[], int numProcesses, char* currentProcessName) {
+    //printf("hi,try to evict\n");
+    char lruProcessName[10];
+    int minLastUsed = INT_MAX;
+    int lruProcessIndex = -1; 
+
+    // 寻找LRU进程，并把当前进程占用的排除
+    for (int i = 0; i < numProcesses; i++) {
+        if (strcmp(processes[i].name, currentProcessName) != 0 && processes[i].lastUsed < minLastUsed) {
+            minLastUsed = processes[i].lastUsed;
+            strcpy(lruProcessName, processes[i].name);
+            lruProcessIndex = i;//这是被找到的那个lru
+        }
+    }
+
+    int pagesFreed = 0;
+
+    // 驱逐
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+        if (strcmp(frames[i].owner, lruProcessName) == 0) {
+            frames[i].occupied = false;
+            frames[i].owner[0] = '\0'; 
+            frames[i].page_number = -1;
+            pagesFreed++;
+        }
+    }
+    
+    if (lruProcessIndex != -1) {
+        processes[lruProcessIndex].haspage = false;
+    }
+
+
+    //printf("Evicted %d pages from process %s\n", pagesFreed, lruProcessName);
+    return pagesFreed;
+}
+
+
+double calculatePageUsage() {
+    int occupiedFrames = 0;
+
+    // 遍历所有帧，统计被占用的帧数
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+        if (frames[i].occupied) {
+            occupiedFrames++;
+        }
+    }
+
+    
+    double memUsage = (double)occupiedFrames / TOTAL_FRAMES * 100.0;
+    return memUsage;
+}
+
+
+
+
+
 
 
 
@@ -243,7 +361,6 @@ double calculateMemoryUsage() {
 
 //Command build///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
-    
     Process processes[10];
     int numProcesses = 0;
     char *filename = NULL;
@@ -252,6 +369,7 @@ int main(int argc, char *argv[]) {
     int currentTime = 0;
     int completedProcesses = 0;
     initMemory();
+    initFrames();
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -277,107 +395,117 @@ int main(int argc, char *argv[]) {
 
 
 
-while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[numProcesses].name, &processes[numProcesses].serviceTime, &processes[numProcesses].memoryRequirement) != EOF) {
-    processes[numProcesses].remainingTime = processes[numProcesses].serviceTime;
-    numProcesses++;
-}
-// for (int i = 0; i < numProcesses; i++) {
-//     printf("Process %s, Memory Requirement: %d\n", processes[i].name, processes[i].memoryRequirement);
-// }
+    while(fscanf(file, "%d %s %d %d", &processes[numProcesses].startTime, processes[numProcesses].name, &processes[numProcesses].serviceTime, &processes[numProcesses].memoryRequirement) != EOF) {
+        processes[numProcesses].remainingTime = processes[numProcesses].serviceTime;
+        numProcesses++;
+    }
+    // for (int i = 0; i < numProcesses; i++) {
+    //     printf("Process %s, Memory Requirement: %d\n", processes[i].name, processes[i].memoryRequirement);
+    // }
 
     fclose(file);
 
-for (int i = 0; i < numProcesses; i++) {
-    processes[i].memoryStart = -1; 
-}
+    for (int i = 0; i < numProcesses; i++) {
+        processes[i].memoryStart = -1; 
+        processes[i].haspage=false;
+    }
     
+    //allocate algorithm//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
-
-//allocate algorithm//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-//Round Robin////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //Round Robin////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if (strcmp(memoryStrategy, "infinite") == 0) {
         runRoundRobin(processes, numProcesses, quantum, &currentTime, &completedProcesses);
-}
+    }
 
-//First in first out////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-else if (strcmp(memoryStrategy, "first-fit") == 0) {
-    int currentProcess = -1; 
-    int lastProcess = -1;
-    int quantumCounter = 0;
-    double memUsage = 0;
+    //First in first out////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    else if (strcmp(memoryStrategy, "first-fit") == 0) {
+        int currentProcess = -1;
+        int lastProcess = -1;
+        int quantumCounter = 0;
+        double memUsage = 0;
     
 
-    while(completedProcesses < numProcesses) {
-        bool foundProcessToRun = false;
-        for(int i = 0; i < numProcesses; i++) {
-            currentProcess = (currentProcess + 1) % numProcesses;
+        while(completedProcesses < numProcesses) {
+            bool foundProcessToRun = false;
 
-   
-           
-            int remainingProcesses = 0;
-            for(int j = 0; j < numProcesses; j++) {
-                if(processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
-                    remainingProcesses++;
-                }
-            }
+            for(int i = 0; i < numProcesses; i++) {
+                currentProcess = (currentProcess + 1) % numProcesses;
+                int remainingProcesses = 0;
 
-           
-            if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
-                //printf("Current Time: %d, Current Process: %d\n", currentTime, currentProcess);
-
-            
-                if (processes[currentProcess].memoryStart == -1) {
-
-                    
-                    
-                   
-                    bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
-                    
-                    
-                    //printf("Memory allocated %d\n", processes[currentProcess].memoryStart);
-                    
-                    if (!isMemoryAllocated) {
-                        addToWaitingQueue(&processes[currentProcess]);
-                        continue;
-                    }
-                    memUsage = calculateMemoryUsage(processes, numProcesses); 
-                    
-                }
-
-                foundProcessToRun = true;
-                if (quantumCounter == 0 && currentProcess != lastProcess) {
-                    printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%.2f%%,allocated-at=%d\n",
-                           currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
-                           memUsage, processes[currentProcess].memoryStart);
-                    lastProcess = currentProcess;
-                }
-
-                if (++quantumCounter == quantum) {
-                    processes[currentProcess].remainingTime -= quantum;
-                    currentTime += quantum;
-                    quantumCounter = 0; 
-
-                    if (processes[currentProcess].remainingTime <= 0) {
-                        processes[currentProcess].finishTime = currentTime;
-                        completedProcesses++;
-                        freeMemory(&processes[currentProcess]); 
-                        tryAllocateMemoryForWaitingProcesses();
-                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d,\n",
-                               currentTime, processes[currentProcess].name, remainingProcesses - 1);
+                for(int j = 0; j < numProcesses; j++) {
+                    if (processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
+                        remainingProcesses++;
+                        //printf("process remain=%d\n", remainingProcesses);
                     }
                 }
+
+           
+                if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
+                    //printf("Current Time: %d, Current Process: %d\n", currentTime, currentProcess);
+
+                    if (processes[currentProcess].memoryStart == -1) {
+                        bool isMemoryAllocated = allocateMemory(&processes[currentProcess]);
+                        //printf("Memory allocated %d\n", processes[currentProcess].memoryStart);
+                    
+                        if (!isMemoryAllocated) {
+                            addToWaitingQueue(&processes[currentProcess]);
+                            continue;
+                        }
+                    }
+
+                    foundProcessToRun = true;
+                    if (quantumCounter == 0 && (currentProcess != lastProcess || queueSize > 0)) {
+                        while(currentTime % quantum != 0){
+                            currentTime++;
+                        }
+
+                        memUsage = calculateMemoryUsage(processes, numProcesses);
+
+                        printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%d%%,allocated-at=%d\n",
+                                currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
+                                (int)memUsage, processes[currentProcess].memoryStart);
+                                
+                        lastProcess = currentProcess;
+                    }
+
+                    if (++quantumCounter == quantum) {
+                        
+                        processes[currentProcess].remainingTime -= quantum;
+                        //printf("remain--%d\n",processes[currentProcess].remainingTime);
+
+                        currentTime += quantum;
+                        quantumCounter = 0; 
+                    
+
+
+                 
+
+                        if (processes[currentProcess].remainingTime <= 0) {
+                            processes[currentProcess].finishTime = currentTime;
+                            completedProcesses++;
+                            freeMemory(&processes[currentProcess]);
+                            //printf("free\n"); 
+                            tryAllocateMemoryForWaitingProcesses();
+                            
+                            for (int k = 0; k < numProcesses; k++) {
+                                if (processes[k].startTime == currentTime && k != currentProcess) {
+                                    remainingProcesses++;
+                                }
+                            }
+                            printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n",
+                                    currentTime, processes[currentProcess].name, remainingProcesses-1);
+                        }
+                    }
+
                 break; 
+                }
+            }
+
+            if (!foundProcessToRun && quantumCounter == 0) {
+                currentTime++; 
             }
         }
-
-        if (!foundProcessToRun && quantumCounter == 0) {
-            currentTime++; 
-        }
-    }
 
     
     for(int i = 0; i < numProcesses; i++) {
@@ -390,12 +518,130 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
 
 
 
+//paged mode////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+else if (strcmp(memoryStrategy, "paged") == 0){
+        int currentProcess = -1;
+        int lastProcess = -1;
+        int quantumCounter = 0;
+        double memUsage = 0;
+    
+
+        while(completedProcesses < numProcesses) {
+            bool foundProcessToRun = false;
+
+            for(int i = 0; i < numProcesses; i++) {
+                currentProcess = (currentProcess + 1) % numProcesses;
+                int remainingProcesses = 0;
+
+                for(int j = 0; j < numProcesses; j++) {
+                    if (processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
+                        remainingProcesses++;
+                        //printf("process remain=%d\n", remainingProcesses);
+                    }
+                }
+
+           
+                if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
+                    //printf("Current Time: %d, Current Process: %d\n", currentTime, currentProcess);
+
+                if (!processes[currentProcess].haspage) {
+                    bool isMemoryAllocated = allocatePages(&processes[currentProcess]);
+
+                    while (!isMemoryAllocated) {
+                        
+                        int freedPages = evictPage(processes, numProcesses, processes[currentProcess].name);
+                        if (freedPages == 0) {
+                            
+                            //printf("No more pages can be evicted to allocate memory for %s\n", processes[currentProcess].name);
+                            break;
+                        }
+                        
+                        isMemoryAllocated = allocatePages(&processes[currentProcess]);
+                    }
+                    if(isMemoryAllocated){
+                        processes[currentProcess].lastUsed=currentTime;
+                    }
+
+                    if (!isMemoryAllocated) {
+                        
+                        printf("Failed to allocate memory for %s after evictions\n", processes[currentProcess].name);
+                        continue; 
+                    }
+                }
+
+
+                    foundProcessToRun = true;
+                    if (quantumCounter == 0 && (currentProcess != lastProcess || queueSize > 0)) {
+                        
+                        while(currentTime % quantum != 0){
+                            currentTime++;
+                        }
+
+                        memUsage = calculatePageUsage();
+
+                    printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%d%%,mem-frames=[",
+                        currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
+                        (int)memUsage);
+
+                    bool isFirst = true;  
+
+                    for (int i = 0; i < TOTAL_FRAMES; i++) {
+                        if (strcmp(frames[i].owner, processes[currentProcess].name) == 0) {
+                            if (!isFirst) {
+                                printf(",");  
+                            }
+                            printf("%d", i);  
+                            isFirst = false;  
+                        }
+                    }
+                    printf("]\n");
 
 
 
+                                
+                        lastProcess = currentProcess;
+                    }
 
+                    if (++quantumCounter == quantum) {
+                        
+                        
+                        processes[currentProcess].remainingTime -= quantum;
+                        //printf("remain--%d\n",processes[currentProcess].remainingTime);
 
+                        currentTime += quantum;
+                        quantumCounter = 0; 
+                        //printf("hi there i m here\n");
 
+                        if (processes[currentProcess].remainingTime <= 0) {
+                            //printf("hi there");
+                            processes[currentProcess].finishTime = currentTime;
+                            completedProcesses++;
+                            evictPage(processes, numProcesses, processes[currentProcess].name);
+                            //printf("free\n"); 
+                            tryAllocateMemoryForWaitingProcesses();
+                            
+                            for (int k = 0; k < numProcesses; k++) {
+                                if (processes[k].startTime == currentTime && k != currentProcess) {
+                                    remainingProcesses++;
+                                }
+                            }
+                            printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n",
+                                    currentTime, processes[currentProcess].name, remainingProcesses-1);
+                        }
+                    }
+
+                break; 
+                }
+            }
+
+            if (!foundProcessToRun && quantumCounter == 0) {
+                currentTime++; 
+            }
+        }
+
+    
+
+}
 
 
 
@@ -405,6 +651,7 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
     double totalTurnaroundTime = 0;
     double totalOverhead=0;
     double maxOverhead=0.00;
+
     for(int i = 0; i < numProcesses; i++) {
         totalTurnaroundTime += processes[i].finishTime - processes[i].startTime;
         int turnaroundTime = processes[i].finishTime - processes[i].startTime;
@@ -415,17 +662,10 @@ else if (strcmp(memoryStrategy, "first-fit") == 0) {
             maxOverhead = timeOverhead;
             
         }
-
-        
-
-        
     }
+
     double averageTurnaroundTime = totalTurnaroundTime / numProcesses;
-    
-    
-
     double averageTimeOverhead =totalOverhead / completedProcesses ; 
-
     printf("Turnaround time %.0f\n", ceil(averageTurnaroundTime));
     printf("Time overhead %.2f %.2f\n", maxOverhead, averageTimeOverhead);
     printf("Makespan %d\n", currentTime);
