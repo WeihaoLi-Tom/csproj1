@@ -668,30 +668,36 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                     
                     
                     if (processes[currentProcess].remainingTime <= 0) {
-                        //bool isdone=true;
-                        //printf("we r coming!!!!!!!!!!!!!!!!\n");
-                        //currentProcess分情况设置？
-                        int* freedPages2 = evictPage(processes, numProcesses, processes[currentProcess-1].name, &freedCount);
-                        //printf("Attempting to evict pages for process: %s\n", processes[currentProcess-1].name);
-
-                        if (freedPages2) {
-                            //printf("we r fking here!!!!!!!!!!!!!!!!\n");
-                            printf("%d,EVICTED,evicted-frames=[", currentTime);
-                            for (int i = 0; i < freedCount; i++) {
-                                if (i > 0) printf(",");
-                                printf("%d", freedPages2[i]);
+                        
+                        if (remainingProcesses == 1) { 
+                            
+                            for (int i = 0; i < numProcesses; i++) {
+                                //printf("free memory");
+                                if (processes[currentProcess].haspage) {
+                                    int* freedPages = evictPage(processes, numProcesses, processes[i].name, &freedCount);
+                                    //printf("freedcount%d\n",freedCount);
+                                    if (freedPages) {
+                                        printf("%d,EVICTED,evicted-frames=[", currentTime);
+                                        for (int j = 0; j < freedCount; j++) {
+                                            if (j > 0) printf(",");
+                                            printf("%d", freedPages[j]);
+                                        }
+                                        printf("]\n");
+                                        free(freedPages);
+                                    }
+                                }
                             }
-                            printf("]\n");
-                            free(freedPages2);
                         }
 
+                        // 更新完成时间和计数，打印完成信息
                         processes[currentProcess].finishTime = currentTime;
                         completedProcesses++;
                         
                         printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n",
-                               currentTime, processes[currentProcess].name, remainingProcesses - 1);
-                        //isdone=false;
+                            currentTime, processes[currentProcess].name, remainingProcesses - 1);
                     }
+
+
                 }
                 break;
             }
@@ -701,6 +707,28 @@ else if (strcmp(memoryStrategy, "paged") == 0){
             currentTime++;
         }
     }
+
+
+
+    //     for(int i = 0; i < numProcesses; i++) {
+    //     //printf("free memory");
+    //     if(processes[currentProcess].haspage) {
+            
+    //      int* freedPages2 = evictPage(processes, numProcesses, processes[i].name, &freedCount);
+    //        //printf("freedcount%d\n",freedCount);
+
+    //         if (freedPages2) {
+                            
+    //              printf("%d,EVICTED,evicted-frames=[", currentTime);
+    //             for (int i = 0; i < freedCount; i++) {
+    //                 if (i > 0) printf(",");
+    //                 printf("%d", freedPages2[i]);
+    //             }
+    //             printf("]\n");
+    //             free(freedPages2);
+    //         }
+    //     }
+    // }
 }
 
 
