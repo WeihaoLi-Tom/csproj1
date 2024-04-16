@@ -668,7 +668,7 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                                 //printf("free memory");
                                 if (processes[currentProcess].haspage) {
                                     int* freedPages = evictPage(processes, numProcesses, processes[i].name, &freedCount);
-                                    //printf("freedcount%d\n",freedCount);
+                                    printf("freedcount%d\n",freedCount);
                                     if (freedPages) {
                                         printf("%d,EVICTED,evicted-frames=[", currentTime);
                                         for (int j = 0; j < freedCount; j++) {
@@ -682,8 +682,10 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                             }                        
                             }else{
 
-                        int* freedPages2 = evictPage(processes, numProcesses, processes[currentProcess-1].name, &freedCount);
-                        //printf("Attempting to evict pages for process: %s\n", processes[currentProcess-1].name);
+                        int* freedPages2 = evictPage(processes, numProcesses, processes[0].name, &freedCount);//这个意思是，除了currentprocess-1之外，其他所有进程的占用都应该被清除
+                        //printf("Attempting to evict pages excpet : %s\n", processes[currentProcess-1].name);
+                        //printf("but current process is: %s\n", processes[currentProcess].name);
+                        //printf("free page number is:%d\n",freedCount);
 
                         if (freedPages2) {
                             //printf("we r fking here!!!!!!!!!!!!!!!!\n");
