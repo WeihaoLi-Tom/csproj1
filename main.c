@@ -629,6 +629,7 @@ for (int i = 0; i < numProcesses; i++) {
 //paged mode////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 else if (strcmp(memoryStrategy, "paged") == 0){
     int currentProcess = 0;  
+    int lastProcess = -1;
     int quantumCounter = 0;
     double memUsage = 0;
     int freedCount = 0;
@@ -690,7 +691,7 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                 }
 
                 foundProcessToRun = true;
-                if (quantumCounter == 0) {
+                if (quantumCounter == 0 && currentProcess != lastProcess) {
                     while(currentTime % quantum != 0){
                         currentTime++;
                     }
@@ -710,6 +711,8 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                         }
                     }
                     printf("]\n");
+
+                    lastProcess = currentProcess;
                 }
 
                 if (++quantumCounter == quantum || currentTime == 0) {
