@@ -687,6 +687,25 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                                     }
                                 }
                             }
+                        }else{
+
+                        int* freedPages2 = evictPage(processes, numProcesses, processes[currentProcess-1].name, &freedCount);
+                        //printf("Attempting to evict pages for process: %s\n", processes[currentProcess-1].name);
+
+                        if (freedPages2) {
+                            //printf("we r fking here!!!!!!!!!!!!!!!!\n");
+                            printf("%d,EVICTED,evicted-frames=[", currentTime);
+                            for (int i = 0; i < freedCount; i++) {
+                                if (i > 0) printf(",");
+                                printf("%d", freedPages2[i]);
+                            }
+                            printf("]\n");
+                            free(freedPages2);
+                        }
+
+
+
+
                         }
 
                         // 更新完成时间和计数，打印完成信息
