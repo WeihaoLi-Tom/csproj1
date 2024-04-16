@@ -393,7 +393,7 @@ double calculatePageUsage() {
     }
 
     
-    double memUsage = (double)occupiedFrames / TOTAL_FRAMES * 100.0;
+    double memUsage = ceil((double)occupiedFrames / TOTAL_FRAMES * 100.0);
     return memUsage;
 }
 
@@ -575,7 +575,7 @@ for (int i = 0; i < numProcesses; i++) {
 
 //paged mode////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 else if (strcmp(memoryStrategy, "paged") == 0){
-    int currentProcess = 0;  // 使用索引代替ID，简化队列操作
+    int currentProcess = 0;  
     int quantumCounter = 0;
     double memUsage = 0;
     int freedCount = 0;
@@ -695,9 +695,6 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                             printf("]\n");
                             free(freedPages2);
                         }
-
-
-
 
                         }
                             
