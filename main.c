@@ -658,7 +658,7 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                     lastProcess = currentProcess;
                 }
 
-                if (++quantumCounter == quantum) {//这个loop的开始条件是：到整除时间片了，并且发现某个进程已经ok了
+                if (++quantumCounter == quantum||currentTime==0) {//这个loop的开始条件是：到整除时间片了，并且发现某个进程已经ok了
                     processes[currentProcess].remainingTime -= quantum;
                     currentTime += quantum;
                     quantumCounter = 0;
@@ -728,26 +728,6 @@ else if (strcmp(memoryStrategy, "paged") == 0){
     }
 
 
-
-    //     for(int i = 0; i < numProcesses; i++) {
-    //     //printf("free memory");
-    //     if(processes[currentProcess].haspage) {
-            
-    //      int* freedPages2 = evictPage(processes, numProcesses, processes[i].name, &freedCount);
-    //        //printf("freedcount%d\n",freedCount);
-
-    //         if (freedPages2) {
-                            
-    //              printf("%d,EVICTED,evicted-frames=[", currentTime);
-    //             for (int i = 0; i < freedCount; i++) {
-    //                 if (i > 0) printf(",");
-    //                 printf("%d", freedPages2[i]);
-    //             }
-    //             printf("]\n");
-    //             free(freedPages2);
-    //         }
-    //     }
-    // }
 }
 
 
