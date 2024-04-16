@@ -668,7 +668,7 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                                 //printf("free memory");
                                 if (processes[currentProcess].haspage) {
                                     int* freedPages = evictPage(processes, numProcesses, processes[i].name, &freedCount);
-                                    printf("freedcount%d\n",freedCount);
+                                    //printf("freedcount%d\n",freedCount);
                                     if (freedPages) {
                                         printf("%d,EVICTED,evicted-frames=[", currentTime);
                                         for (int j = 0; j < freedCount; j++) {
