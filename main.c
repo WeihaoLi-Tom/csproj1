@@ -262,57 +262,75 @@ void initFrames() {
         frames[i].page_number = -1; 
     }
 }
-// void printPagesAllocated(Process* process) {
-//     //printf("Pages allocated for process %s: [", process->name);
-//     int first = 1;  // 用于格式化输出，避免在数组开始处打印逗号
-//     for (int i = 0; i < TOTAL_FRAMES; i++) {
-//         if (process->pagesAllocated[i] != -1) {  
-//             if (!first) {
-//                 printf(", ");
-//             }
-//             printf("%d", process->pagesAllocated[i]);
-//             first = 0;
-//         }
-//     }
-//     printf("]\n");
-// }
+int* logPageAllocation(Process *process, int* count) {
+    int *allocatedFrames = malloc(TOTAL_FRAMES * sizeof(int)); // 动态分配数组存储帧索引
+    if (!allocatedFrames) {
+        printf("Memory allocation failed for allocatedFrames.\n");
+        return NULL;
+    }
+
+    *count = 0;  // 初始化计数器
+    // printf("Pages allocated for process %s: [", process->name);
+    // for (int i = 0; i < TOTAL_FRAMES; i++) {
+    //     if (process->pagesAllocated[i] != -1) {
+    //         allocatedFrames[(*count)++] = process->pagesAllocated[i]; // 将帧索引添加到数组
+    //         printf("%s%d", (*count) > 1 ? ", " : "", process->pagesAllocated[i]);
+    //     }
+    // }
+    // printf("]\n");
+
+    if (*count > 0) {
+        allocatedFrames = realloc(allocatedFrames, (*count) * sizeof(int)); // 调整数组大小以匹配实际分配的帧数量
+    } else {
+        free(allocatedFrames);
+        allocatedFrames = NULL;
+    }
+
+    return allocatedFrames; // 返回分配帧索引的数组
+}
+
+
 
 
 
 bool allocatePages(Process *process) {
-    int pagesNeeded = (process->memoryRequirement + 3) / 4; 
-    int pagesdid = 0;
+    int pagesNeeded = (process->memoryRequirement + 3) / 4;
+    int pagesAllocated = 0;
 
-
-    for (int i = 0; i < TOTAL_FRAMES && pagesdid< pagesNeeded; i++) {
+    for (int i = 0; i < TOTAL_FRAMES && pagesAllocated < pagesNeeded; i++) {
         if (!frames[i].occupied) {
             frames[i].occupied = true;
-            strcpy(frames[i].owner, process->name);  
-            frames[i].page_number = pagesdid;
-            process->pagesAllocated[pagesdid] = i; 
+            strcpy(frames[i].owner, process->name);
+            frames[i].page_number = pagesAllocated;
+            process->pagesAllocated[pagesAllocated] = i;
             
-            pagesdid++;
+            pagesAllocated++;
         }
     }
 
-    // 
-    if (pagesdid == pagesNeeded) {
+    if (pagesAllocated == pagesNeeded) {
         process->haspage = true;
-         //printPagesAllocated(process);
+        int frameCount;
+        int* allocatedFrames = logPageAllocation(process, &frameCount);  // 记录并获取分配的帧
+        if (allocatedFrames) {
+            // 可以使用 allocatedFrames 做进一步处理
+            free(allocatedFrames);
+        }
         return true;
     } else {
         for (int i = 0; i < TOTAL_FRAMES; i++) {
-            if (strcmp(frames[i].owner, process->name) == 0) { 
-                frames[i].occupied = false;  
-                frames[i].owner[0] = '\0';  
-                frames[i].page_number = -1;  
+            if (strcmp(frames[i].owner, process->name) == 0) {
+                frames[i].occupied = false;
+                frames[i].owner[0] = '\0';
+                frames[i].page_number = -1;
+                process->pagesAllocated[i] = -1;
             }
         }
-        process->haspage = false; 
-        //这里应该要直接消除之前分配的所有帧，但可能有更好的办法？
+        process->haspage = false;
         return false;
     }
 }
+
 
 
 int* evictPage(Process processes[], int numProcesses, char* currentProcessName, int* count) {
@@ -379,6 +397,23 @@ int* evictPage(Process processes[], int numProcesses, char* currentProcessName, 
 }
 
 
+void evictDonePages(Process *process) {
+    //printf("wtfffffffffffffffffffffffff\n");
+    if (!process->haspage) return;  // 如果进程没有分配的页面，直接返回
+
+    //printf("Evicting pages for process %s\n", process->name);
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+  // 如果此帧被该进程占用
+            int frameIndex = process->pagesAllocated[i];
+            frames[frameIndex].occupied = false;
+            frames[frameIndex].owner[0] = '\0';
+            frames[frameIndex].page_number = -1;
+            process->pagesAllocated[i] = -1;  // 标记为未分配
+        
+    }
+    process->haspage = false;  // 标记进程没有分配任何页面
+}
+
 
 
 
@@ -401,6 +436,23 @@ double calculatePageUsage() {
 
 
 
+void printPagesAllocated(int currentTime, Process *process) {
+    printf("%d,EVICTED,evicted-frames=[", currentTime);
+    int first = 1;  // 用于格式化输出，避免在数组开始处打印逗号
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+        if (process->pagesAllocated[i] != -1) {  // 检查是否有分配的帧
+            if (!first) {
+                printf(",");
+            }
+            printf("%d", process->pagesAllocated[i]);
+            first = 0; // 之后的打印需要逗号
+        }
+    }
+    printf("]\n");
+}
+
+
+
 
 
 
@@ -418,6 +470,7 @@ int main(int argc, char *argv[]) {
     int completedProcesses = 0;
     initMemory();
     initFrames();
+    
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -581,6 +634,7 @@ else if (strcmp(memoryStrategy, "paged") == 0){
     int freedCount = 0;
     bool allPagesAllocated = false;
 
+
     // 使用动态数组模拟队列
     int *processQueue = malloc(numProcesses * sizeof(int));
     int queueSize = 0;
@@ -607,6 +661,9 @@ else if (strcmp(memoryStrategy, "paged") == 0){
 
                 if (!processes[currentProcess].haspage) {
                     allPagesAllocated = allocatePages(&processes[currentProcess]);
+
+                    //printPagesAllocated(&processes[currentProcess]);
+                    processes[currentProcess].lastUsed=currentTime;
 
                     while (!allPagesAllocated) { // 如果分配失败
                         int* freedPages = evictPage(processes, numProcesses, processes[currentProcess].name, &freedCount);
@@ -682,21 +739,13 @@ else if (strcmp(memoryStrategy, "paged") == 0){
                             }                        
                             }else{
 
-                        int* freedPages2 = evictPage(processes, numProcesses, processes[0].name, &freedCount);//这个意思是，除了currentprocess-1之外，其他所有进程的占用都应该被清除
+                        
                         //printf("Attempting to evict pages excpet : %s\n", processes[currentProcess-1].name);
                         //printf("but current process is: %s\n", processes[currentProcess].name);
-                        //printf("free page number is:%d\n",freedCount);
-
-                        if (freedPages2) {
-                            //printf("we r fking here!!!!!!!!!!!!!!!!\n");
-                            printf("%d,EVICTED,evicted-frames=[", currentTime);
-                            for (int i = 0; i < freedCount; i++) {
-                                if (i > 0) printf(",");
-                                printf("%d", freedPages2[i]);
-                            }
-                            printf("]\n");
-                            free(freedPages2);
-                        }
+                       // printf("free page number is:%d\n",freedCount);
+                        //printf("current is:%d\n",currentProcess);
+                        printPagesAllocated(currentTime,&processes[currentProcess]);
+                        evictDonePages(&processes[currentProcess]);
 
                         }
                             
