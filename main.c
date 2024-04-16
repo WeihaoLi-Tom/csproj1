@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
+#include <limits.h>
 #define TOTAL_MEMORY 2048
 #define MAX_QUEUE_SIZE 10
 #define TOTAL_FRAMES 512 
@@ -20,7 +21,8 @@ typedef struct {
     int memoryStart;
     int lastUsed;
     bool haspage;
-    //int pagesAllocated[TOTAL_FRAMES]; 
+    int pagesAllocated[TOTAL_FRAMES]; 
+; 
      
 } Process;
 
@@ -260,19 +262,34 @@ void initFrames() {
         frames[i].page_number = -1; 
     }
 }
+// void printPagesAllocated(Process* process) {
+//     //printf("Pages allocated for process %s: [", process->name);
+//     int first = 1;  // 用于格式化输出，避免在数组开始处打印逗号
+//     for (int i = 0; i < TOTAL_FRAMES; i++) {
+//         if (process->pagesAllocated[i] != -1) {  
+//             if (!first) {
+//                 printf(", ");
+//             }
+//             printf("%d", process->pagesAllocated[i]);
+//             first = 0;
+//         }
+//     }
+//     printf("]\n");
+// }
+
 
 
 bool allocatePages(Process *process) {
     int pagesNeeded = (process->memoryRequirement + 3) / 4; 
     int pagesdid = 0;
 
-    // 找空闲帧
+
     for (int i = 0; i < TOTAL_FRAMES && pagesdid< pagesNeeded; i++) {
         if (!frames[i].occupied) {
             frames[i].occupied = true;
             strcpy(frames[i].owner, process->name);  
             frames[i].page_number = pagesdid;
-            //process->pagesAllocated[pagesdid] = true;
+            process->pagesAllocated[pagesdid] = i; 
             
             pagesdid++;
         }
@@ -281,6 +298,7 @@ bool allocatePages(Process *process) {
     // 
     if (pagesdid == pagesNeeded) {
         process->haspage = true;
+         //printPagesAllocated(process);
         return true;
     } else {
         for (int i = 0; i < TOTAL_FRAMES; i++) {
@@ -297,41 +315,71 @@ bool allocatePages(Process *process) {
 }
 
 
-int evictPage(Process processes[], int numProcesses, char* currentProcessName) {
-    //printf("hi,try to evict\n");
+int* evictPage(Process processes[], int numProcesses, char* currentProcessName, int* count) {
+
+    //printf("im doing evict\n");
     char lruProcessName[10];
     int minLastUsed = INT_MAX;
-    int lruProcessIndex = -1; 
+    int lruProcessIndex = -1;
 
     // 寻找LRU进程，并把当前进程占用的排除
     for (int i = 0; i < numProcesses; i++) {
         if (strcmp(processes[i].name, currentProcessName) != 0 && processes[i].lastUsed < minLastUsed) {
             minLastUsed = processes[i].lastUsed;
             strcpy(lruProcessName, processes[i].name);
-            lruProcessIndex = i;//这是被找到的那个lru
+            lruProcessIndex = i;
         }
     }
 
-    int pagesFreed = 0;
+    int* evictedFrames = NULL;
+    *count = 0;  // 使用指针参数输出帧数量
 
     // 驱逐
-    for (int i = 0; i < TOTAL_FRAMES; i++) {
-        if (strcmp(frames[i].owner, lruProcessName) == 0) {
-            frames[i].occupied = false;
-            frames[i].owner[0] = '\0'; 
-            frames[i].page_number = -1;
-            pagesFreed++;
-        }
-    }
-    
     if (lruProcessIndex != -1) {
-        processes[lruProcessIndex].haspage = false;
+        Process *lruProcess = &processes[lruProcessIndex];
+        evictedFrames = malloc(TOTAL_FRAMES * sizeof(int));
+        if (!evictedFrames) {
+            printf("Memory allocation failed for evictedFrames.\n");
+            return NULL;
+        }
+        
+        for (int i = 0; i < TOTAL_FRAMES; i++) {
+            if (strcmp(frames[i].owner, lruProcessName) == 0) {
+                frames[i].occupied = false;
+                frames[i].owner[0] = '\0';
+                frames[i].page_number = -1;
+                
+                // 记录被驱逐的帧索引
+                evictedFrames[(*count)++] = i;
+
+                // 清除 pagesAllocated 数组中的对应条目
+                for (int j = 0; j < TOTAL_FRAMES; j++) {
+                    if (lruProcess->pagesAllocated[j] == i) {
+                        lruProcess->pagesAllocated[j] = -1;
+                        break;  
+                    }
+                }
+            }
+        }
+
+        // 标记该进程没有页
+        lruProcess->haspage = false;
     }
 
+    if (*count > 0) {
+        // 调整数组大小以匹配实际被驱逐的帧数
+        evictedFrames = realloc(evictedFrames, (*count) * sizeof(int));
+    } else {
+        // 没有帧被驱逐，释放数组并设置为NULL
+        free(evictedFrames);
+        evictedFrames = NULL;
+    }
 
-    //printf("Evicted %d pages from process %s\n", pagesFreed, lruProcessName);
-    return pagesFreed;
+    return evictedFrames;
 }
+
+
+
 
 
 double calculatePageUsage() {
@@ -405,10 +453,17 @@ int main(int argc, char *argv[]) {
 
     fclose(file);
 
-    for (int i = 0; i < numProcesses; i++) {
-        processes[i].memoryStart = -1; 
-        processes[i].haspage=false;
+for (int i = 0; i < numProcesses; i++) {
+    processes[i].memoryStart = -1;
+    processes[i].haspage = false;
+
+    // 初始化 pagesAllocated 数组，将所有条目设置为 -1 表示未分配
+    for (int j = 0; j < TOTAL_FRAMES; j++) {
+        processes[i].pagesAllocated[j] = -1;
     }
+}
+
+
     
     //allocate algorithm//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -520,128 +575,135 @@ int main(int argc, char *argv[]) {
 
 //paged mode////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 else if (strcmp(memoryStrategy, "paged") == 0){
-        int currentProcess = -1;
-        int lastProcess = -1;
-        int quantumCounter = 0;
-        double memUsage = 0;
-    
+    int currentProcess = -1;
+    int lastProcess = -1;
+    int quantumCounter = 0;
+    double memUsage = 0;
+    int freedCount = 0;
+    //bool isdone=false;
 
-        while(completedProcesses < numProcesses) {
-            bool foundProcessToRun = false;
+    while(completedProcesses < numProcesses) {
+        bool foundProcessToRun = false;
 
-            for(int i = 0; i < numProcesses; i++) {
-                currentProcess = (currentProcess + 1) % numProcesses;
-                int remainingProcesses = 0;
+        for(int i = 0; i < numProcesses; i++) {
+            currentProcess = (currentProcess + 1) % numProcesses;
+            int remainingProcesses = 0;
 
-                for(int j = 0; j < numProcesses; j++) {
-                    if (processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
-                        remainingProcesses++;
-                        //printf("process remain=%d\n", remainingProcesses);
-                    }
+            for(int j = 0; j < numProcesses; j++) {
+                if (processes[j].startTime <= currentTime && processes[j].remainingTime > 0) {
+                    remainingProcesses++;
                 }
+            }
 
-           
-                if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
-                    //printf("Current Time: %d, Current Process: %d\n", currentTime, currentProcess);
+            if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
+
+
 
                 if (!processes[currentProcess].haspage) {
                     bool isMemoryAllocated = allocatePages(&processes[currentProcess]);
 
-                    while (!isMemoryAllocated) {
+                    while (!isMemoryAllocated) {//这个Loop开始条件是：轮到某个进程了且分配失败
+                        int* freedPages = evictPage(processes, numProcesses, processes[currentProcess].name, &freedCount);
+                        //printf("Attempting to evict pages for process: %s,freepage=%n\n", processes[currentProcess].name, freedPages);
+                        if (freedPages) {
+                            printf("%d,EVICTED,evicted-frames=[", currentTime);
+                            for (int i = 0; i < freedCount; i++) {
+                                if (i > 0) printf(",");
+                                printf("%d", freedPages[i]);
+                            }
+                            printf("]\n");
+                            free(freedPages);
+                        }
                         
-                        int freedPages = evictPage(processes, numProcesses, processes[currentProcess].name);
-                        if (freedPages == 0) {
-                            
-                            //printf("No more pages can be evicted to allocate memory for %s\n", processes[currentProcess].name);
+                        
+
+                        if (freedCount == 0) {
                             break;
                         }
                         
                         isMemoryAllocated = allocatePages(&processes[currentProcess]);
                     }
-                    if(isMemoryAllocated){
-                        processes[currentProcess].lastUsed=currentTime;
+                    if (isMemoryAllocated) {
+                        processes[currentProcess].lastUsed = currentTime;
                     }
 
                     if (!isMemoryAllocated) {
-                        
-                        printf("Failed to allocate memory for %s after evictions\n", processes[currentProcess].name);
-                        continue; 
+                        continue;
                     }
                 }
 
+                foundProcessToRun = true;
+                if (quantumCounter == 0 && (currentProcess != lastProcess || queueSize > 0)) {
+                    while(currentTime % quantum != 0){
+                        currentTime++;
+                    }
 
-                    foundProcessToRun = true;
-                    if (quantumCounter == 0 && (currentProcess != lastProcess || queueSize > 0)) {
-                        
-                        while(currentTime % quantum != 0){
-                            currentTime++;
-                        }
-
-                        memUsage = calculatePageUsage();
+                    memUsage = calculatePageUsage();
 
                     printf("%d,RUNNING,process-name=%s,remaining-time=%d,mem-usage=%d%%,mem-frames=[",
                         currentTime, processes[currentProcess].name, processes[currentProcess].remainingTime,
                         (int)memUsage);
 
-                    bool isFirst = true;  
+                    bool isFirst = true;
 
                     for (int i = 0; i < TOTAL_FRAMES; i++) {
                         if (strcmp(frames[i].owner, processes[currentProcess].name) == 0) {
-                            if (!isFirst) {
-                                printf(",");  
-                            }
-                            printf("%d", i);  
-                            isFirst = false;  
+                            if (!isFirst) printf(",");
+                            printf("%d", i);
+                            isFirst = false;
                         }
                     }
                     printf("]\n");
 
-
-
-                                
-                        lastProcess = currentProcess;
-                    }
-
-                    if (++quantumCounter == quantum) {
-                        
-                        
-                        processes[currentProcess].remainingTime -= quantum;
-                        //printf("remain--%d\n",processes[currentProcess].remainingTime);
-
-                        currentTime += quantum;
-                        quantumCounter = 0; 
-                        //printf("hi there i m here\n");
-
-                        if (processes[currentProcess].remainingTime <= 0) {
-                            //printf("hi there");
-                            processes[currentProcess].finishTime = currentTime;
-                            completedProcesses++;
-                            evictPage(processes, numProcesses, processes[currentProcess].name);
-                            //printf("free\n"); 
-                            tryAllocateMemoryForWaitingProcesses();
-                            
-                            for (int k = 0; k < numProcesses; k++) {
-                                if (processes[k].startTime == currentTime && k != currentProcess) {
-                                    remainingProcesses++;
-                                }
-                            }
-                            printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n",
-                                    currentTime, processes[currentProcess].name, remainingProcesses-1);
-                        }
-                    }
-
-                break; 
+                    lastProcess = currentProcess;
                 }
-            }
 
-            if (!foundProcessToRun && quantumCounter == 0) {
-                currentTime++; 
+                if (++quantumCounter == quantum) {//这个loop的开始条件是：到整除时间片了，并且发现某个进程已经ok了
+                    processes[currentProcess].remainingTime -= quantum;
+                    currentTime += quantum;
+                    quantumCounter = 0;
+
+
+
+                    
+                    
+                    if (processes[currentProcess].remainingTime <= 0) {
+                        //bool isdone=true;
+                        //printf("we r coming!!!!!!!!!!!!!!!!\n");
+                        //currentProcess分情况设置？
+                        int* freedPages2 = evictPage(processes, numProcesses, processes[currentProcess-1].name, &freedCount);
+                        //printf("Attempting to evict pages for process: %s\n", processes[currentProcess-1].name);
+
+                        if (freedPages2) {
+                            //printf("we r fking here!!!!!!!!!!!!!!!!\n");
+                            printf("%d,EVICTED,evicted-frames=[", currentTime);
+                            for (int i = 0; i < freedCount; i++) {
+                                if (i > 0) printf(",");
+                                printf("%d", freedPages2[i]);
+                            }
+                            printf("]\n");
+                            free(freedPages2);
+                        }
+
+                        processes[currentProcess].finishTime = currentTime;
+                        completedProcesses++;
+                        
+                        printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n",
+                               currentTime, processes[currentProcess].name, remainingProcesses - 1);
+                        //isdone=false;
+                    }
+                }
+                break;
             }
         }
 
-    
-
+        if (!foundProcessToRun && quantumCounter == 0) {
+            currentTime++;
+        }
+    }
 }
+
+
 
 
 
