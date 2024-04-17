@@ -22,6 +22,7 @@ typedef struct {
     int lastUsed;
     bool haspage;
     int pagesAllocated[TOTAL_FRAMES]; 
+    int nextQueueTime;
 ; 
      
 } Process;
@@ -510,6 +511,77 @@ bool allocatePagesvirtual(Process *process) {
 }
 
 
+void printProcessQueue(int* queue, Process* processes, int queueSize) {
+    printf("Current Process Queue: [");
+    for (int i = 0; i < queueSize; i++) {
+        int pid = queue[i];
+        printf("(%s, %d)", processes[pid].name, processes[pid].nextQueueTime);
+        if (i < queueSize - 1) {
+            printf(", ");
+        }
+    }
+    printf("]\n");
+}
+
+
+
+
+
+int* evictPagevirtual(Process processes[], int numProcesses, char* currentProcessName, int* count) {
+    
+    //printf("current evicting process is:%s\n",currentProcessName);
+    int* evictedFrames = malloc(TOTAL_FRAMES * sizeof(int));
+    if (!evictedFrames) {
+        printf("Memory allocation failed for evictedFrames.\n");
+        return NULL;
+    }
+
+    *count = 0;
+    int neededFrames = 4;
+    int freeFrames = 0;
+
+    // 首先计算当前空闲的帧数
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+        if (!frames[i].occupied) {
+            freeFrames++;
+        }
+    }
+
+    // 如果空闲帧数少于4，则开始驱逐帧直到有至少4个空闲帧
+    if (freeFrames < neededFrames) {
+        for (int i = 0; i < TOTAL_FRAMES && freeFrames < neededFrames; i++) {
+            if (frames[i].occupied && strcmp(frames[i].owner, currentProcessName) != 0) {
+                frames[i].occupied = false;
+                frames[i].owner[0] = '\0';
+                frames[i].page_number = -1;
+
+                // 记录被驱逐的帧索引
+                evictedFrames[(*count)++] = i;
+                freeFrames++;
+
+                // 更新相应进程的 pagesAllocated
+                for (int p = 0; p < numProcesses; p++) {
+                    if (strcmp(processes[p].name, frames[i].owner) == 0) {
+                        processes[p].pagesAllocated[i] = -1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (*count > 0) {
+        // 调整数组大小以匹配实际被驱逐的帧数
+        evictedFrames = realloc(evictedFrames, (*count) * sizeof(int));
+    } else {
+        // 没有帧被驱逐，释放数组并设置为NULL
+        free(evictedFrames);
+        evictedFrames = NULL;
+    }
+
+    return evictedFrames;
+}
+
 
 //Command build///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
@@ -851,10 +923,16 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
     // 使用动态数组模拟队列
     int *processQueue = malloc(numProcesses * sizeof(int));
     int queueSize = 0;
+
+
     for (int i = 0; i < numProcesses; i++) {
         processQueue[queueSize++] = i; // 初始化队列，所有进程入队
+        
     }
-
+    for (int i = 0; i < numProcesses; i++) {
+        processQueue[i] = i;
+        processes[i].nextQueueTime = processes[i].startTime;
+    }
     while(completedProcesses < numProcesses && queueSize > 0) {
         bool foundProcessToRun = false;
 
@@ -879,7 +957,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                     processes[currentProcess].lastUsed=currentTime;
 
                     while (!allPagesAllocated) { // 如果分配失败
-                        int* freedPages = evictPage(processes, numProcesses, processes[currentProcess].name, &freedCount);
+                        int* freedPages = evictPagevirtual(processes, numProcesses, processes[currentProcess].name, &freedCount);
                         if (freedPages) {
                             printf("%d,EVICTED,evicted-frames=[", currentTime);
                             for (int j = 0; j < freedCount; j++) {
@@ -931,6 +1009,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                     processes[currentProcess].remainingTime -= quantum;
                     currentTime += quantum;
                     quantumCounter = 0;
+                    processes[currentProcess].nextQueueTime += quantum;
 
                     if (processes[currentProcess].remainingTime <= 0) {
 
@@ -939,7 +1018,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                             for (int i = 0; i < numProcesses; i++) {
                                 //printf("free memory");
                                 if (processes[currentProcess].haspage) {
-                                    int* freedPages = evictPage(processes, numProcesses, processes[i].name, &freedCount);
+                                    int* freedPages = evictPagevirtual(processes, numProcesses, processes[i].name, &freedCount);
                                     //printf("freedcount%d\n",freedCount);
                                     if (freedPages) {
                                         printf("%d,EVICTED,evicted-frames=[", currentTime);
@@ -977,11 +1056,24 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                         printf("%d,FINISHED,process-name=%s,proc-remaining=%d\n",
                             currentTime, processes[currentProcess].name, queueSize);
                     } else {
-                        // 将当前进程移至队尾
-                        for (int j = i; j < queueSize - 1; j++) {
-                            processQueue[j] = processQueue[j + 1];
-                        }
-                        processQueue[queueSize - 1] = currentProcess;
+        for (int j = i; j < queueSize - 1; j++) {
+            processQueue[j] = processQueue[j + 1];
+        }
+        queueSize--;
+
+        // 使用插入排序将当前进程插入回队列
+        int newPos;
+        for (newPos = 0; newPos < queueSize; newPos++) {
+            if (processes[processQueue[newPos]].nextQueueTime > processes[currentProcess].nextQueueTime) {
+                break;
+            }
+        }
+        for (int j = queueSize; j > newPos; j--) {
+            processQueue[j] = processQueue[j - 1];
+        }
+        processQueue[newPos] = currentProcess;
+        queueSize++;
+        //printProcessQueue(processQueue, processes, queueSize);
                     }
                 }
                 break;
