@@ -619,6 +619,44 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
 }
 
 
+int* evictAllPages(Process processes[], int numProcesses, int* count) {
+    int* evictedFrames = malloc(TOTAL_FRAMES * sizeof(int));
+    if (!evictedFrames) {
+        printf("Memory allocation failed for evictedFrames.\n");
+        return NULL;
+    }
+
+    *count = 0; // 初始化驱逐帧计数器
+
+    // 遍历所有帧，将它们标记为未占用，并记录被驱逐的帧索引
+    for (int i = 0; i < TOTAL_FRAMES; i++) {
+        if (frames[i].occupied) {
+            frames[i].occupied = false;
+            frames[i].owner[0] = '\0';
+            frames[i].page_number = -1;
+            evictedFrames[(*count)++] = i;
+
+            // 更新相关进程的 pagesAllocated
+            for (int j = 0; j < numProcesses; j++) {
+                if (processes[j].pagesAllocated[i] != -1) {
+                    processes[j].pagesAllocated[i] = -1;
+                    processes[j].haspage = false;
+                }
+            }
+        }
+    }
+
+    if (*count > 0) {
+        evictedFrames = realloc(evictedFrames, (*count) * sizeof(int)); // 调整数组大小以匹配实际被驱逐的帧数
+    } else {
+        free(evictedFrames);
+        evictedFrames = NULL;
+    }
+
+    return evictedFrames;
+}
+
+
 
 
 
@@ -1065,8 +1103,8 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                             for (int i = 0; i < numProcesses; i++) {
                                 //printf("free memory");
                                 if (processes[currentProcess].haspage) {
-                                    int* freedPages = evictPage(processes, numProcesses, processes[i].name, &freedCount);
-                                    //printf("freedcount%d\n",freedCount);
+                                    int* freedPages = evictAllPages(processes, numProcesses, &freedCount);
+                                    printf("freedcount%d\n",freedCount);
                                     if (freedPages) {
                                         printf("%d,EVICTED,evicted-frames=[", currentTime);
                                         for (int j = 0; j < freedCount; j++) {
