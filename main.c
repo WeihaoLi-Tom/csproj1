@@ -603,7 +603,7 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
 
             if (pagewehave==4) {
                 processes[lruProcessIndex].haspage = false;
-                printf("All pages of %s have been evicted. Set haspage to false.\n", processes[lruProcessIndex].name);
+                //printf("All pages of %s have been evicted. Set haspage to false.\n", processes[lruProcessIndex].name);
             }
         }
     }
