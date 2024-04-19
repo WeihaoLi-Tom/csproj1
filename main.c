@@ -1104,7 +1104,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                                 //printf("free memory");
                                 if (processes[currentProcess].haspage) {
                                     int* freedPages = evictAllPages(processes, numProcesses, &freedCount);
-                                    printf("freedcount%d\n",freedCount);
+                                    //printf("freedcount%d\n",freedCount);
                                     if (freedPages) {
                                         printf("%d,EVICTED,evicted-frames=[", currentTime);
                                         for (int j = 0; j < freedCount; j++) {
@@ -1114,7 +1114,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                                         printf("]\n");
                                         free(freedPages);
                                     }
-                                }
+                                }S
                             }                        
                             }else{
 
