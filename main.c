@@ -1114,7 +1114,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                                         printf("]\n");
                                         free(freedPages);
                                     }
-                                }S
+                                }
                             }                        
                             }else{
 
