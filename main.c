@@ -523,13 +523,19 @@ void printProcessQueue(int* queue, Process* processes, int queueSize) {
     printf("]\n");
 }
 
+void printProcessesLastUsed(Process* processes, int numProcesses) {
+    printf("Processes last used times:\n");
+    for (int i = 0; i < numProcesses; i++) {
+        printf("Process %s last used at time %d\n", processes[i].name, processes[i].lastUsed);
+    }
+}
 
 
 
 
 int* evictPagevirtual(Process processes[], int numProcesses, char* currentProcessName, int* count) {
-    
-    //printf("current evicting process is:%s\n",currentProcessName);
+    ///printf("virtual evicting!!!!!!!!!!!!!!!!!!!!!!!\n");
+    int pagewehave=0;
     int* evictedFrames = malloc(TOTAL_FRAMES * sizeof(int));
     if (!evictedFrames) {
         printf("Memory allocation failed for evictedFrames.\n");
@@ -549,38 +555,72 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
 
     // 如果空闲帧数少于4，则开始驱逐帧直到有至少4个空闲帧
     if (freeFrames < neededFrames) {
-        for (int i = 0; i < TOTAL_FRAMES && freeFrames < neededFrames; i++) {
-            if (frames[i].occupied && strcmp(frames[i].owner, currentProcessName) != 0) {
-                frames[i].occupied = false;
-                frames[i].owner[0] = '\0';
-                frames[i].page_number = -1;
+        int lruProcessIndex = -1;
+        int lruTime = INT_MAX;
 
-                // 记录被驱逐的帧索引
-                evictedFrames[(*count)++] = i;
-                freeFrames++;
+        // 寻找除当前进程之外的最小LRU进程
+        for (int i = 0; i < numProcesses; i++) {
+            if (processes[i].lastUsed < lruTime && processes[i].lastUsed >= 0 && strcmp(processes[i].name, currentProcessName) != 0) {
+                lruTime = processes[i].lastUsed;
+                lruProcessIndex = i;
+            }
+        }
 
-                // 更新相应进程的 pagesAllocated
-                for (int p = 0; p < numProcesses; p++) {
-                    if (strcmp(processes[p].name, frames[i].owner) == 0) {
-                        processes[p].pagesAllocated[i] = -1;
-                        break;
+
+                    for (int j = 0; j < TOTAL_FRAMES; j++) {
+                        
+                        if (strcmp(frames[j].owner, processes[lruProcessIndex].name) == 0) {
+
+                            pagewehave++;
+
+                        }
                     }
+                    //printf("pagewehave=%d\n",pagewehave);
+
+
+        if (lruProcessIndex != -1) {
+            //printf("Evicting LRU process: %s\n", processes[lruProcessIndex].name);
+            // 驱逐该进程的最多四个帧
+            int evictions = 0;
+            for (int i = 0; i < TOTAL_FRAMES && evictions < 4; i++) {
+                if (frames[i].occupied && strcmp(frames[i].owner, processes[lruProcessIndex].name) == 0) {
+                    frames[i].occupied = false;
+                    frames[i].owner[0] = '\0';
+                    frames[i].page_number = -1;
+                    evictedFrames[(*count)++] = i;
+                    processes[lruProcessIndex].pagesAllocated[i] = -1;
+                    evictions++;
                 }
+            }
+            // 检查该进程是否还有剩余的页
+            // bool hasPages = false;
+            // for (int i = 0; i < TOTAL_FRAMES; i++) {
+            //     if (strcmp(frames[i].owner, processes[lruProcessIndex].name) == 0) {
+            //         hasPages = true;
+            //         break;
+            //     }
+            // }
+
+            if (pagewehave==4) {
+                processes[lruProcessIndex].haspage = false;
+                printf("All pages of %s have been evicted. Set haspage to false.\n", processes[lruProcessIndex].name);
             }
         }
     }
 
     if (*count > 0) {
-        // 调整数组大小以匹配实际被驱逐的帧数
-        evictedFrames = realloc(evictedFrames, (*count) * sizeof(int));
+        evictedFrames = realloc(evictedFrames, (*count) * sizeof(int)); // 调整数组大小
     } else {
-        // 没有帧被驱逐，释放数组并设置为NULL
         free(evictedFrames);
         evictedFrames = NULL;
     }
 
     return evictedFrames;
 }
+
+
+
+
 
 
 //Command build///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -932,6 +972,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
     for (int i = 0; i < numProcesses; i++) {
         processQueue[i] = i;
         processes[i].nextQueueTime = processes[i].startTime;
+        processes[i].lastUsed=-1;
     }
     while(completedProcesses < numProcesses && queueSize > 0) {
         bool foundProcessToRun = false;
@@ -952,11 +993,14 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
 
                 if (!processes[currentProcess].haspage) {
                     allPagesAllocated = allocatePagesvirtual(&processes[currentProcess]);
+                    //printf("allocate result,for=%d%s\n",allPagesAllocated,processes[currentProcess].name);
 
                     //printPagesAllocated(&processes[currentProcess]);
                     processes[currentProcess].lastUsed=currentTime;
+                    //printProcessesLastUsed(processes, numProcesses);
 
                     while (!allPagesAllocated) { // 如果分配失败
+                    //printf("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\n");
                         int* freedPages = evictPagevirtual(processes, numProcesses, processes[currentProcess].name, &freedCount);
                         if (freedPages) {
                             printf("%d,EVICTED,evicted-frames=[", currentTime);
@@ -1007,9 +1051,12 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
 
                 if (++quantumCounter == quantum || currentTime == 0) {
                     processes[currentProcess].remainingTime -= quantum;
+                                        processes[currentProcess].lastUsed=currentTime;
+                    //printProcessesLastUsed(processes, numProcesses);
                     currentTime += quantum;
                     quantumCounter = 0;
-                    processes[currentProcess].nextQueueTime += quantum;
+                    processes[currentProcess].nextQueueTime =currentTime;
+                    //printf("current time is %d\n",currentTime);
 
                     if (processes[currentProcess].remainingTime <= 0) {
 
