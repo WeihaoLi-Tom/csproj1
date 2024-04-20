@@ -550,8 +550,10 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
     for (int i = 0; i < TOTAL_FRAMES; i++) {
         if (!frames[i].occupied) {
             freeFrames++;
+            //printf("freeframesnumber is %d\n",freeFrames);
         }
     }
+    int frametoevict=neededFrames-freeFrames;
 
     // 如果空闲帧数少于4，则开始驱逐帧直到有至少4个空闲帧
     if (freeFrames < neededFrames) {
@@ -596,7 +598,7 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
             //printf("Evicting LRU process: %s\n", processes[lruProcessIndex].name);
             // 驱逐该进程的最多四个帧
             int evictions = 0;
-            for (int i = 0; i < TOTAL_FRAMES && evictions < 4; i++) {
+            for (int i = 0; i < TOTAL_FRAMES && evictions < frametoevict; i++) {
                 if (frames[i].occupied && strcmp(frames[i].owner, processes[lruProcessIndex].name) == 0) {
                     frames[i].occupied = false;
                     frames[i].owner[0] = '\0';
