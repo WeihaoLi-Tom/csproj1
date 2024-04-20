@@ -861,6 +861,7 @@ else if (strcmp(memoryStrategy, "paged") == 0){
             }
 
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
+                
 
                 if (!processes[currentProcess].haspage) {
                     allPagesAllocated = allocatePages(&processes[currentProcess]);
@@ -1032,6 +1033,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
 
                 if (!processes[currentProcess].haspage) {
+                    //printf("haspage?%d\n",processes[currentProcess].haspage);
                     allPagesAllocated = allocatePagesvirtual(&processes[currentProcess]);
                     //printf("allocate result,for=%d%s\n",allPagesAllocated,processes[currentProcess].name);
 
@@ -1059,9 +1061,9 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                         allPagesAllocated = allocatePagesvirtual(&processes[currentProcess]);
                     }
 
-                    if (!allPagesAllocated) {
-                        continue; // 无法分配，尝试下一个进程
-                    }
+                    // if (!allPagesAllocated) {
+                    //     continue; // 无法分配，尝试下一个进程
+                    // }
                 }
 
                 foundProcessToRun = true;
@@ -1098,17 +1100,18 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
 
 
                     //processes[currentProcess].nextQueueTime =currentTime+1;
+                    
+                
+                for (int i = 0; i < queueSize; i++) {
+                    if (processes[processQueue[i]].nextQueueTime == currentTime) {
+                        printf("hi i find");
+                        processes[currentProcess].nextQueueTime = currentTime + 1;
+                        break;  
+                    }else{
+                        processes[currentProcess].nextQueueTime = currentTime;
+                    }
+                }
 
-    for (int i = 0; i < queueSize; i++) {
-        if (processes[processQueue[i]].nextQueueTime == currentTime) {
-            processes[currentProcess].nextQueueTime =currentTime+1;
-        
-        }else{
-            processes[currentProcess].nextQueueTime =currentTime;
-
-        }
-
-    }
 
                     //printf("current time is %d\n",currentTime);
                     
