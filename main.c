@@ -1017,7 +1017,9 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
 
         // 循环尝试队列中的每个进程
         for(int i = 0; i < queueSize; i++) {
+            
             currentProcess = processQueue[i];
+            //printf("current is %s\n",processes[currentProcess].name);
             int remainingProcesses = 0;
 
 
@@ -1093,8 +1095,23 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                     //printProcessesLastUsed(processes, numProcesses);
                     currentTime += quantum;
                     quantumCounter = 0;
-                    processes[currentProcess].nextQueueTime =currentTime;
+
+
+                    //processes[currentProcess].nextQueueTime =currentTime+1;
+
+    for (int i = 0; i < queueSize; i++) {
+        if (processes[processQueue[i]].nextQueueTime == currentTime) {
+            processes[currentProcess].nextQueueTime =currentTime+1;
+        
+        }else{
+            processes[currentProcess].nextQueueTime =currentTime;
+
+        }
+
+    }
+
                     //printf("current time is %d\n",currentTime);
+                    
 
                     if (processes[currentProcess].remainingTime <= 0) {
 
@@ -1147,17 +1164,24 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
         queueSize--;
 
         // 使用插入排序将当前进程插入回队列
-        int newPos;
-        for (newPos = 0; newPos < queueSize; newPos++) {
-            if (processes[processQueue[newPos]].nextQueueTime > processes[currentProcess].nextQueueTime) {
-                break;
-            }
-        }
-        for (int j = queueSize; j > newPos; j--) {
-            processQueue[j] = processQueue[j - 1];
-        }
-        processQueue[newPos] = currentProcess;
-        queueSize++;
+int newPos;
+for (newPos = 0; newPos < queueSize; newPos++) {
+    if (processes[processQueue[newPos]].nextQueueTime > processes[currentProcess].nextQueueTime ||
+        (processes[processQueue[newPos]].nextQueueTime == processes[currentProcess].nextQueueTime &&
+         processes[processQueue[newPos]].lastUsed > processes[currentProcess].lastUsed)) {
+        break;
+    }
+}
+
+// 移动现有元素以为新元素腾出空间
+for (int j = queueSize; j > newPos; j--) {
+    processQueue[j] = processQueue[j - 1];
+}
+
+// 插入当前进程到计算出的位置
+processQueue[newPos] = currentProcess;
+queueSize++;
+
         //printProcessQueue(processQueue, processes, queueSize);
                     }
                 }
