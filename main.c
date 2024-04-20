@@ -558,12 +558,26 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
         int lruProcessIndex = -1;
         int lruTime = INT_MAX;
 
-        // 寻找除当前进程之外的最小LRU进程
-        for (int i = 0; i < numProcesses; i++) {
-            if (processes[i].lastUsed < lruTime && processes[i].lastUsed >= 0 && strcmp(processes[i].name, currentProcessName) != 0) {
-                lruTime = processes[i].lastUsed;
-                lruProcessIndex = i;
+        // 循环以确保找到一个有页面的LRU进程
+        bool foundLRU = false;
+        while (!foundLRU) {
+            for (int i = 0; i < numProcesses; i++) {
+                int pagecount = 0;
+                // 计算每个进程的页面数
+                for (int j = 0; j < TOTAL_FRAMES; j++) {
+                    if (frames[j].occupied && strcmp(frames[j].owner, processes[i].name) == 0) {
+                        pagecount++;
+                    }
+                }
+                // 寻找LRU且有页面的进程
+                if (processes[i].lastUsed < lruTime && processes[i].lastUsed >= 0 && strcmp(processes[i].name, currentProcessName) != 0 && pagecount > 0) {
+                    lruTime = processes[i].lastUsed;
+                    lruProcessIndex = i;
+                    foundLRU = true; // 找到有效的LRU进程
+                }
             }
+            // 如果没有找到有页面的LRU进程，退出循环
+            if (!foundLRU) break;
         }
 
 
@@ -592,14 +606,7 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
                     evictions++;
                 }
             }
-            // 检查该进程是否还有剩余的页
-            // bool hasPages = false;
-            // for (int i = 0; i < TOTAL_FRAMES; i++) {
-            //     if (strcmp(frames[i].owner, processes[lruProcessIndex].name) == 0) {
-            //         hasPages = true;
-            //         break;
-            //     }
-            // }
+
 
             if (pagewehave==4) {
                 processes[lruProcessIndex].haspage = false;
@@ -617,6 +624,7 @@ int* evictPagevirtual(Process processes[], int numProcesses, char* currentProces
 
     return evictedFrames;
 }
+
 
 
 int* evictAllPages(Process processes[], int numProcesses, int* count) {
@@ -1033,7 +1041,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
             if (currentTime >= processes[currentProcess].startTime && processes[currentProcess].remainingTime > 0) {
 
                 if (!processes[currentProcess].haspage) {
-                    //printf("haspage?%d\n",processes[currentProcess].haspage);
+                    
                     allPagesAllocated = allocatePagesvirtual(&processes[currentProcess]);
                     //printf("allocate result,for=%d%s\n",allPagesAllocated,processes[currentProcess].name);
 
@@ -1044,6 +1052,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                     while (!allPagesAllocated) { // 如果分配失败
                     //printf("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\n");
                         int* freedPages = evictPagevirtual(processes, numProcesses, processes[currentProcess].name, &freedCount);
+                        //printf("current is %s\n",processes[currentProcess].name);
                         if (freedPages) {
                             printf("%d,EVICTED,evicted-frames=[", currentTime);
                             for (int j = 0; j < freedCount; j++) {
@@ -1054,16 +1063,18 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                             free(freedPages);
                         }
 
-                        if (freedCount == 0) { // 无页面可驱逐
+                        if (freedCount == 0) {
+                            //printf("hi guys problem is here\n"); // 无页面可驱逐
                             break;
                         }
 
                         allPagesAllocated = allocatePagesvirtual(&processes[currentProcess]);
                     }
 
-                    // if (!allPagesAllocated) {
-                    //     continue; // 无法分配，尝试下一个进程
-                    // }
+                    if (!allPagesAllocated) {
+                        //printf("i cant do this%d\n",allPagesAllocated);
+                        continue; // 无法分配，尝试下一个进程
+                    }
                 }
 
                 foundProcessToRun = true;
