@@ -1104,7 +1104,7 @@ else if (strcmp(memoryStrategy, "virtual") == 0){
                 
                 for (int i = 0; i < queueSize; i++) {
                     if (processes[processQueue[i]].nextQueueTime == currentTime) {
-                        printf("hi i find");
+                        //printf("hi i find");
                         processes[currentProcess].nextQueueTime = currentTime + 1;
                         break;  
                     }else{
